@@ -13,14 +13,14 @@ const show = ref(true);
     <!-- Show panel button -->
     <Transition name="panel-fade">
       <div class="panelx show-btn" v-show="!show">
-        <ElButton @click="show = !show">Show</ElButton>
+        <ElButton @click="show = !show" style="width: 7ch">Show</ElButton>
       </div>
     </Transition>
 
     <!-- Top panel -->
     <Transition name="panel-top">
       <div class="panelx panel1" v-show="show">
-        <ElButton @click="show = !show">Hide</ElButton>
+        <ElButton @click="show = !show" style="width: 7ch">Hide</ElButton>
       </div>
     </Transition>
 
@@ -84,21 +84,13 @@ const show = ref(true);
   grid-column: leftmid / rightmid;
   grid-row: bottommid / bottom;
 }
-.panelx {
-  overflow: hidden;
-  overflow-x: scroll;
-}
-.panely {
-  overflow: scroll;
-  overflow-x: hidden;
-}
 .panelx,
 .panely {
-  opacity: 0.9;
+  opacity: 0.95;
   pointer-events: auto;
-  background-color: white;
+  background-color: rgba(255, 255, 255, 0.7);
   border-radius: 8px;
-  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.3));
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
   padding: 5px 10px;
 }
 
@@ -108,7 +100,7 @@ const show = ref(true);
   grid-row: top;
   pointer-events: none;
   background: none;
-  filter: none;
+  box-shadow: none;
 }
 .show-btn > * {
   pointer-events: auto;
@@ -127,7 +119,7 @@ const show = ref(true);
 .panel-left-leave-active,
 .panel-right-leave-active,
 .panel-fade-leave-active {
-  transition: transform 0.3s cubic-bezier(1, 0.5, 0.8, 1);
+  transition: transform 0.3s ease-out;
 }
 .panel-top-enter-from,
 .panel-top-leave-to {
@@ -147,5 +139,27 @@ const show = ref(true);
 }
 .panel-fade-enter-from,
 .panel-fade-leave-to {
+}
+
+/* Panel content */
+.panelx {
+  overflow: hidden;
+  overflow-x: scroll;
+  display: flex;
+  justify-content: left;
+  align-items: center;
+}
+.panely {
+  overflow: scroll;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: left;
+  align-items: left;
+}
+.panely > * {
+  margin-left: 0;
+  margin-right: 0;
 }
 </style>
