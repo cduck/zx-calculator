@@ -5,9 +5,23 @@
     <link rel="icon" href="favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no" />
     <title>ViZX</title>
+      <style>
+.loading {
+  vertical-align: center;
+  text-align: center;
+  padding-top: 50vh;
+  margin-top: -0.5em;
+}
+      </style>
   </head>
   <body>
-    <div id="app">ViZX is an interactive web app.  Please enable JavaScript to use.</div>
+    <div id="app">
+      ViZX is an interactive web app.  Please enable JavaScript to use.
+    </div>
+    <script>
+// Remove no JavaScript warning
+document.getElementById("app").innerHTML = "<div class=\"loading\">Loading...</div>";
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

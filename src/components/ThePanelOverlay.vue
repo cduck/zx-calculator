@@ -1,14 +1,46 @@
 <script setup>
 import { ref, defineProps } from "vue";
+import { ElButton } from "element-plus";
+import { configs } from "../graphStyle.js";
+
+const show = ref(true);
 
 </script>
 
 <template>
   <div class="grid-container">
-    <div class="panelx panel1">One</div>
-    <div class="panely panel2">Two</div>
-    <div class="panely panel3">Three</div>
-    <div class="panelx panel4">Four</div>
+
+    <!-- Show panel button -->
+    <Transition name="panel-fade">
+      <div class="panelx show-btn" v-show="!show">
+        <ElButton @click="show = !show">Show</ElButton>
+      </div>
+    </Transition>
+
+    <!-- Top panel -->
+    <Transition name="panel-top">
+      <div class="panelx panel1" v-show="show">
+        <ElButton @click="show = !show">Hide</ElButton>
+      </div>
+    </Transition>
+
+    <!-- Left panel -->
+    <Transition name="panel-left">
+      <div class="panely panel2" v-show="show">Two</div>
+    </Transition>
+
+    <!-- Right Panel -->
+    <Transition name="panel-right">
+      <div class="panely panel3" v-show="show">
+        Three
+      </div>
+    </Transition>
+
+    <!-- Bottom Panel -->
+    <Transition name="panel-bottom">
+      <div class="panelx panel4" v-show="show">Four</div>
+    </Transition>
+
   </div>
 </template>
 
@@ -20,6 +52,7 @@ import { ref, defineProps } from "vue";
   --bottom-height: 30px;
 }
 
+/* Panel grid and placement */
 .grid-container {
   display: grid;
   grid-template-columns: [left] var(--left-width) [leftmid] 1fr [rightmid] var(
@@ -67,5 +100,52 @@ import { ref, defineProps } from "vue";
   border-radius: 8px;
   filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.3));
   padding: 5px 10px;
+}
+
+/* Show button */
+.show-btn {
+  grid-column: left;
+  grid-row: top;
+  pointer-events: none;
+  background: none;
+  filter: none;
+}
+.show-btn > * {
+  pointer-events: auto;
+}
+
+/* Panel transitions */
+.panel-top-enter-active,
+.panel-bottom-enter-active,
+.panel-left-enter-active,
+.panel-right-enter-active,
+.panel-fade-enter-active {
+  transition: transform 0.3s ease-out;
+}
+.panel-top-leave-active,
+.panel-bottom-leave-active,
+.panel-left-leave-active,
+.panel-right-leave-active,
+.panel-fade-leave-active {
+  transition: transform 0.3s cubic-bezier(1, 0.5, 0.8, 1);
+}
+.panel-top-enter-from,
+.panel-top-leave-to {
+  transform: translateY(calc(-1 * var(--top-height) - 20px));
+}
+.panel-bottom-enter-from,
+.panel-bottom-leave-to {
+  transform: translateY(calc(1 * var(--bottom-height) + 20px));
+}
+.panel-left-enter-from,
+.panel-left-leave-to {
+  transform: translateX(calc(-1 * var(--left-width) - 20px));
+}
+.panel-right-enter-from,
+.panel-right-leave-to {
+  transform: translateX(calc(1 * var(--right-width) + 20px));
+}
+.panel-fade-enter-from,
+.panel-fade-leave-to {
 }
 </style>
