@@ -5,12 +5,15 @@ import {
   ElSwitch,
   ElTooltip,
   ElRadioButton,
+  ElInput,
 } from "element-plus";
 import { usePanelStore } from "@/stores/panels.js";
+import { useStyleStore } from "@/stores/graphStyle.js";
 
 const show = ref(true);
 
 const panelStore = usePanelStore();
+const styleStore = useStyleStore();
 
 const emit = defineEmits(["command"]);
 </script>
@@ -48,6 +51,10 @@ const emit = defineEmits(["command"]);
           Select nodes:
           <ElTooltip content="Toggle edges on selected nodes [E]">
             <ElButton class="btn" @click="emit('command', 'e')">Toggle Edges</ElButton>
+          </ElTooltip>
+          <ElInput v-model="panelStore.angleToSet" placeholder="Node angle (i.e. \pi)" />
+          <ElTooltip content="Sets the angle parameter of selected nodes [A]">
+            <ElButton class="btn" @click="emit('command', 'a')">Set Angle</ElButton>
           </ElTooltip>
           No selection:
           <ElTooltip content="Create a boundary node [B]">
@@ -111,7 +118,12 @@ const emit = defineEmits(["command"]);
     <Transition name="panel-right">
       <div class="panely panel-right" v-show="show">
         <div>
-          Another panel
+          View Settings:
+          <ElSwitch
+            v-model="styleStore.view.grid.visible"
+            inactive-text=""
+            active-text="Grid"
+          />
         </div>
       </div>
     </Transition>

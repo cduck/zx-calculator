@@ -5,5 +5,6 @@ export const usePanelStore = defineStore("panel", {
   state: () => ({
     rewriteMode: false,
     selectMode: "",
+    angleToSet: "",
   }),
 });
