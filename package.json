@@ -11,6 +11,8 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
   },
   "dependencies": {
+    "element-plus": "^2.1.5",
+    "v-network-graph": "^0.5.7",
     "vue": "^3.2.31",
     "vue-router": "^4.0.12"
   },
