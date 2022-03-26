@@ -1,7 +1,9 @@
 <script setup>
-import { defineEmits } from "vue";
-import { configs } from "../graphStyle.js";
+import { configs } from "@/graphStyle.js";
 //import * as vng from "v-network-graph";
+import { usePanelStore } from "@/stores/panels.js";
+
+const panelStore = usePanelStore();
 
 // Initial graph
 const nodes = {
@@ -44,7 +46,7 @@ const emit = defineEmits(["pan-start", "pan-stop"]);
     @mousedown="mousedown"
     @mouseup="mouseup"
     @mouseout="mouseup"
-    class="main-graph"
+    :class="{ 'main-graph': true, edit: !panelStore.rewriteMode }"
     ref="graphElem"
     :nodes="nodes"
     :edges="edges"
@@ -52,6 +54,7 @@ const emit = defineEmits(["pan-start", "pan-stop"]);
     :configs="configs"
     :event-handlers="eventHandlers"
   />
+  <div class="test"></div>
 </template>
 
 <style scoped>
@@ -61,5 +64,10 @@ const emit = defineEmits(["pan-start", "pan-stop"]);
   left: 0;
   width: 100vw;
   height: 100vh;
+  background-color: rgba(64, 158, 255, 0.1);
+  transition: background-color 0.3s ease-out;
+}
+.main-graph.edit {
+  background-color: rgba(238, 187, 0, 0.1);
 }
 </style>

@@ -6,22 +6,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no" />
     <title>ViZX</title>
       <style>
-.loading {
-  vertical-align: center;
+body {
+  margin: 0;
+  padding: 0;
+}
+#app {
+  height: 100vh;
+  display: flex;
+}
+#loading {
+  width: 100vw;
   text-align: center;
-  padding-top: 50vh;
-  margin-top: -0.5em;
+  align-self: center;
+  justify-self: center;
+  line-height: 1.5;
 }
       </style>
   </head>
   <body>
     <div id="app">
-      ViZX is an interactive web app.  Please enable JavaScript to use.
-    </div>
-    <script>
+      <div id="loading">
+        ViZX is an interactive web app.<br>
+        Please enable JavaScript to run.
+        <script>
 // Remove no JavaScript warning
-document.getElementById("app").innerHTML = "<div class=\"loading\">Loading...</div>";
-    </script>
+document.getElementById("loading").innerText = "Loading...";
+        </script>
+      </div>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

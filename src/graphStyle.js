@@ -158,7 +158,7 @@ export const configs = reactive(
       //margin: 20,
       normal: {
         width: 10,
-        color: "rgba(0,100,255,0.2)"
+        color: "rgba(0,100,255,0.2)",
       },
     },
   })
