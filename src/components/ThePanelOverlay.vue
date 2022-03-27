@@ -52,6 +52,9 @@ const emit = defineEmits(["command"]);
           <ElTooltip content="Toggle edges on selected nodes [E]">
             <ElButton class="btn" @click="emit('command', 'e')">Toggle Edges</ElButton>
           </ElTooltip>
+          <ElTooltip content="Toggle edges on selected nodes [E]">
+            <ElButton class="btn" @click="emit('command', 'E')">Clear Edges</ElButton>
+          </ElTooltip>
           <ElInput v-model="panelStore.angleToSet" placeholder="Node angle (i.e. \pi)" />
           <ElTooltip content="Sets the angle parameter of selected nodes [A]">
             <ElButton class="btn" @click="emit('command', 'a')">Set Angle</ElButton>

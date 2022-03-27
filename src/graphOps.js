@@ -6,6 +6,7 @@ let graphStore = null;
 // TODO: Better indexing
 const nextNodeIndex = ref(null);
 const nextEdgeIndex = ref(null);
+const nextPathIndex = ref(null);
 
 // Setup after load
 export const graphOpsSetup = () => {
@@ -28,9 +29,114 @@ const assert = (condition, msg) => {
   }
 };
 
-// Graph queries
+////////// Graph tests //////////
+export const isBoundaryNode = (nodeId) => {
+  return graphStore.nodes[nodeId].zxType === "boundary";
+};
+
+export const isEdgesValidPath = (edgeIds, ignoreCurrent) => {
+  const orderedEdges = _isEdgesValidPathHelper(edgeIds, ignoreCurrent);
+  return typeof orderedEdges !== "string";
+};
+export const sortValidPathEdges = (edgeIds, ignoreCurrent) => {
+  const orderedEdges = _isEdgesValidPathHelper(edgeIds, ignoreCurrent);
+  if (typeof orderedEdges === "string") {
+    throw new GraphOperationException(orderedEdges);
+  }
+  return orderedEdges;
+};
+export const isEdgesValidPathReason = (edgeIds, ignoreCurrent) => {
+  const orderedEdges = _isEdgesValidPathHelper(edgeIds, ignoreCurrent);
+  if (typeof orderedEdges === "string") {
+    return orderedEdges;
+  } else {
+    return "valid path";
+  }
+};
+export const _isEdgesValidPathHelper = (edgeIds, ignoreCurrent) => {
+  if (edgeIds.length < 1) {
+    return "empty path";
+  }
+
+  if (!ignoreCurrent) {
+    let overlap = false;
+    forPathsOfEdges(edgeIds, () => {
+      overlap = true;
+    });
+    if (overlap) {
+      return "path overlaps with current";
+    }
+  }
+
+  const counts = {};
+  const orderedNodes = [];
+  const neighbors = {};
+  const nodePairToEid = {};
+  // Count nodes used by edges to determine path properties
+  for (const eid of edgeIds) {
+    const [n1, n2] = nodesOfEdge(eid);
+    assert(n1 !== n2, "graph self loop");
+    nodePairToEid[nodePairString(n1, n2)] = eid;
+    if (!counts[n1]) orderedNodes.push(n1);
+    if (!counts[n2]) orderedNodes.push(n2);
+    counts[n1] = (counts[n1] || 0) + 1;
+    counts[n2] = (counts[n2] || 0) + 1;
+    if (!neighbors[n1]) neighbors[n1] = new Set();
+    if (!neighbors[n2]) neighbors[n2] = new Set();
+    neighbors[n1].add(n2);
+    neighbors[n2].add(n1);
+  }
+  const endNodes = [];
+  for (const nid of orderedNodes) {
+    if (counts[nid] > 2) {
+      return "path overlaps with itself or has loops";
+    } else if (counts[nid] == 1) {
+      // Save this end node as the first or last
+      if (!isBoundaryNode(nid)) {
+        return "path ends must be boundary nodes";
+      }
+      endNodes.push(nid);
+    } else {
+      // counts[nid] == 2
+      if (isBoundaryNode(nid)) {
+        return "path body must not be boundary nodes";
+      }
+    }
+  }
+  if (endNodes.length != 2) {
+    // Path is disconnected or a loop
+    return "path is disconnected or a loop";
+  }
+  // Get the final edge order
+  const [first, last] = endNodes;
+  const finalEdges = [];
+  let prev = null;
+  let current = first;
+  // Modifies neighbors in-place
+  while (current != last) {
+    const nextSet = neighbors[current];
+    nextSet.delete(prev);
+    prev = current;
+    assert(nextSet.size === 1, "Internal node count");
+    // current = (only value in nextSet)
+    for (current of nextSet) {
+      // Empty
+    }
+    finalEdges.push(nodePairToEid[nodePairString(prev, current)]);
+  }
+  if (finalEdges.length != edgeIds.length) {
+    return "path is a valid path but with one or more disconnected loops";
+  }
+  return finalEdges;
+};
+
+////////// Graph queries //////////
+const nodesOfEdge = (edgeId) => {
+  return [graphStore.edges[edgeId].source, graphStore.edges[edgeId].target];
+};
+
 // Calls callback for every edge that uses at least one node
-export const forEdgesOfNodes = (nodeIds, callback) => {
+const forEdgesOfNodes = (nodeIds, callback) => {
   const nodeIdSet = nodeIds instanceof Set ? nodeIds : new Set(nodeIds);
   const edges = graphStore.edges;
   for (const edgeId of Object.keys(edges)) {
@@ -44,7 +150,7 @@ export const forEdgesOfNodes = (nodeIds, callback) => {
 };
 
 // Calls callback for every edge that uses at least two nodes
-export const forInnerEdgesOfNodes = (nodeIds, callback) => {
+const forInnerEdgesOfNodes = (nodeIds, callback) => {
   const nodeIdSet = nodeIds instanceof Set ? nodeIds : new Set(nodeIds);
   const edges = graphStore.edges;
   for (const edgeId of Object.keys(edges)) {
@@ -58,7 +164,7 @@ export const forInnerEdgesOfNodes = (nodeIds, callback) => {
 };
 
 // Calls callback for every path that uses at least one edge
-export const forPathsOfEdges = (edgeIds, callback) => {
+const forPathsOfEdges = (edgeIds, callback) => {
   const paths = graphStore.paths;
   for (const pathId of Object.keys(paths)) {
     const pathEdgeSet = new Set(paths[pathId].edges);
@@ -88,7 +194,7 @@ export const forCompleteGraph = (nodeIds, callback) => {
   }
 };
 
-// Graph subroutines
+////////// Graph subroutines //////////
 const nodePairString = (n1, n2) => {
   if (n1 <= n2) {
     return `${n1}$${n2}`;
@@ -97,7 +203,7 @@ const nodePairString = (n1, n2) => {
   }
 };
 
-// Graph operations
+////////// Graph operations //////////
 export const addNode = (zxType) => {
   assert(zxType, "required argument");
   let nodeId = `node${nextNodeIndex.value}`;
@@ -149,7 +255,7 @@ export const addHadamardEdge = (n1, n2) => {
 
 // If zxType is undefined, uses normal edges only to boundary nodes
 // If zxType, enforces this type for removed edges
-export const toggleEdges = (nodeIds, zxType) => {
+export const toggleEdges = (nodeIds, zxType, clearOnly) => {
   const allEdges = graphStore.edges;
   const oldEdgeIds = new Set();
   const oldNodePairs = new Set();
@@ -169,31 +275,33 @@ export const toggleEdges = (nodeIds, zxType) => {
     delete graphStore.edges[edgeId];
   });
   // Remove any dependent paths
-  forPathsOfEdges(oldEdgeIds, (pathId) => {
-    delete graphStore.paths[pathId];
-  });
-  forCompleteGraph(nodeIds, (n1, n2) => {
-    if (!oldNodePairs.has(nodePairString(n1, n2))) {
-      // Add new edge
-      if (zxType) {
-        addEdge(n1, n2, zxType);
-      } else if (
-        graphStore.nodes[n1].zxType === "boundary" ||
-        graphStore.nodes[n2].zxType === "boundary"
-      ) {
-        addNormalEdge(n1, n2);
-      } else {
-        addHadamardEdge(n1, n2);
+  clearPathsByEdges(oldEdgeIds);
+  if (!clearOnly) {
+    // Add in the new edges
+    forCompleteGraph(nodeIds, (n1, n2) => {
+      if (!oldNodePairs.has(nodePairString(n1, n2))) {
+        // Add new edge
+        if (zxType) {
+          addEdge(n1, n2, zxType);
+        } else if (
+          graphStore.nodes[n1].zxType === "boundary" ||
+          graphStore.nodes[n2].zxType === "boundary"
+        ) {
+          addNormalEdge(n1, n2);
+        } else {
+          addHadamardEdge(n1, n2);
+        }
       }
-    }
-  });
+    });
+  }
+};
+export const clearEdgesBetweenNodes = (nodeIds) => {
+  toggleEdges(nodeIds, undefined, true);
 };
 
 export const deleteEdges = (edges) => {
   // Remove any dependent paths
-  forPathsOfEdges(edges, (pathId) => {
-    delete graphStore.paths[pathId];
-  });
+  forPathsOfEdges(edges);
   // Remove edges
   for (const edgeId of edges) {
     delete graphStore.edges[edgeId];
@@ -208,9 +316,7 @@ export const deleteNodes = (nodes) => {
     delete graphStore.edges[edgeId];
   });
   // Remove any dependent paths
-  forPathsOfEdges(oldEdges, (pathId) => {
-    delete graphStore.paths[pathId];
-  });
+  clearPathsByEdges(oldEdges);
   // Remove nodes and node position info
   for (const nodeId of nodes) {
     delete graphStore.layouts.nodes[nodeId];
@@ -226,4 +332,34 @@ export const setAngle = (nodes, angle) => {
       delete graphStore.nodes[nodeId].zxAngle;
     }
   }
+};
+
+// Remove all paths dependent on these edges
+export const clearPathsByEdges = (edges) => {
+  forPathsOfEdges(edges, (pathId) => {
+    delete graphStore.paths[pathId];
+  });
+};
+
+// Remove all paths dependent on these nodes
+export const clearPathsByNodes = (nodes) => {
+  const oldEdges = [];
+  // Find edges
+  forEdgesOfNodes(nodes, (edgeId) => {
+    oldEdges.push(edgeId);
+  });
+  // Remove any dependent paths
+  clearPathsByEdges(oldEdges);
+};
+
+export const addPathByEdges = (edges) => {
+  const orderedEdges = sortValidPathEdges(edges, true); // Throws if invalid
+  clearPathsByEdges(edges);
+  let pathId = `edge${nextPathIndex.value}`;
+  while (graphStore.paths[pathId]) {
+    nextPathIndex.value *= 2;
+    pathId = `edge${nextPathIndex.value}`;
+  }
+  nextPathIndex.value += 1;
+  graphStore.paths[pathId] = { edges: orderedEdges };
 };

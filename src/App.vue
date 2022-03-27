@@ -3,11 +3,9 @@ import { ref, onBeforeMount, onBeforeUnmount } from "vue";
 import TheGraphView from "@/components/TheGraphView.vue";
 import ThePanelOverlay from "@/components/ThePanelOverlay.vue";
 import { usePanelStore } from "@/stores/panels.js";
-import { useGraphStore } from "@/stores/graph.js";
 import * as gops from "@/graphOps";
 
 const panelStore = usePanelStore();
-const graphStore = useGraphStore();
 gops.graphOpsSetup();
 
 // Disable overlay panels while panning
@@ -44,6 +42,7 @@ const keyup = (e) => {
 const command = (code) => {
   console.log(`Command: ${code}`);
   if (!panelStore.rewriteMode) {
+    // Edit mode
     switch (code) {
       case "n":
         gops.addZNode();
@@ -54,27 +53,42 @@ const command = (code) => {
       case "e":
         gops.toggleEdges(selectedNodes.value);
         break;
+      case "E":
+        gops.clearEdgesBetweenNodes(selectedNodes.value);
+        break;
       case "x":
         gops.deleteEdges(selectedEdges.value);
         gops.deleteNodes(selectedNodes.value);
         break;
       case "a":
-        gops.setAngle(
-          selectedNodes.value.filter(
-            n => ["x", "z"].includes(graphStore.nodes[n].zxType)
-          ),
-          panelStore.angleToSet
-        );
+        setNodeAngles();
+        break;
+      case "s":
+        gops.addPathByEdges(selectedEdges.value);
+        break;
+      case "S":
+        gops.clearPathsByEdges(selectedEdges.value);
+        gops.clearPathsByNodes(selectedEdges.value);
         break;
       default:
         break;
     }
   } else {
+    // Rewrite mode
     switch (code) {
       default:
         break;
     }
   }
+};
+
+// Graph edit commands that clean up the selections before operating on the
+// graph
+const setNodeAngles = () => {
+  gops.setAngle(
+    selectedNodes.value.filter((n) => !gops.isBoundaryNode(n)),
+    panelStore.angleToSet
+  );
 };
 
 const selectedNodes = ref([]);
