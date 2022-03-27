@@ -124,13 +124,24 @@ const emit = defineEmits(["command"]);
             inactive-text=""
             active-text="Grid"
           />
+          <ElSwitch
+            v-model="styleStore.extra.snapTo"
+            inactive-text=""
+            active-text="Snap to grid"
+          />
+          <ElSwitch
+            v-model="styleStore.view.scalingObjects"
+            inactive-text=""
+            active-text="Scale nodes"
+          />
+          <ElButton class="btn" @click="styleStore.extra.zoomLevel=1">Reset Zoom</ElButton>
         </div>
       </div>
     </Transition>
 
     <!-- Bottom Panel -->
     <Transition name="panel-bottom">
-      <div class="panelx panel-bottom" v-show="show && false"><div>Four</div></div>
+      <div class="panelx panel-bottom" v-show="show && false"><div></div></div>
     </Transition>
   </div>
 </template>
@@ -277,5 +288,9 @@ const emit = defineEmits(["command"]);
   margin-left: 0;
   margin-right: 0;
   width: 3ch;
+}
+.sld {
+  padding-left: 10px;
+  padding-right: 10px;
 }
 </style>

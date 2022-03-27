@@ -1,5 +1,6 @@
 <script setup>
-//import * as vng from "v-network-graph";
+import { watch } from "vue";
+import * as vng from "v-network-graph";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
 import { useGraphStore } from "@/stores/graph.js";
@@ -15,6 +16,23 @@ const mousedown = function (event) {
 const mouseup = function (event) {
   emit("pan-stop", event);
 };
+
+// Watch and update grid snap settings
+watch(styleStore.extra, (extra) => {
+  let newSnap = extra.snapTo;
+  if (!newSnap) {
+    delete styleStore.view.layoutHandler;
+  } else {
+    if (newSnap === true) {
+      newSnap = 12.5;
+    }
+    if (!styleStore.view.layoutHandler) {
+      styleStore.view.layoutHandler = new vng.GridLayout({ grid: newSnap });
+    } else {
+      styleStore.view.layoutHandler.grid = newSnap;
+    }
+  }
+});
 
 // TODO
 const eventHandlers = {
@@ -53,8 +71,8 @@ const emit = defineEmits([
     :layouts="graphStore.layouts"
     :selected-nodes="selectedNodes"
     :selected-edges="selectedEdges"
-    @update:selected-nodes="v => emit('update:selectedNodes', v)"
-    @update:selected-edges="v => emit('update:selectedEdges', v)"
+    @update:selected-nodes="(v) => emit('update:selectedNodes', v)"
+    @update:selected-edges="(v) => emit('update:selectedEdges', v)"
     :configs="styleStore"
     v-model:zoom-level="styleStore.extra.zoomLevel"
     :event-handlers="eventHandlers"
