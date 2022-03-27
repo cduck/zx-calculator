@@ -2,8 +2,12 @@
 import { ref, onBeforeMount, onBeforeUnmount } from "vue";
 import TheGraphView from "@/components/TheGraphView.vue";
 import ThePanelOverlay from "@/components/ThePanelOverlay.vue";
+import { usePanelStore } from "@/stores/panels.js";
+import { useGraphStore } from "@/stores/graph.js";
 import * as gops from "@/graphOps";
 
+const panelStore = usePanelStore();
+const graphStore = useGraphStore();
 gops.graphOpsSetup();
 
 // Disable overlay panels while panning
@@ -39,19 +43,53 @@ const keyup = (e) => {
 // Execute graph commands
 const command = (code) => {
   console.log(`Command: ${code}`);
-  switch (code) {
-    case "n":
-      gops.addZNode();
-      break;
+  if (!panelStore.rewriteMode) {
+    switch (code) {
+      case "n":
+        gops.addZNode();
+        break;
+      case "b":
+        gops.addBoundaryNode();
+        break;
+      case "e":
+        gops.toggleEdges(selectedNodes.value);
+        break;
+      case "x":
+        gops.deleteEdges(selectedEdges.value);
+        gops.deleteNodes(selectedNodes.value);
+        break;
+      case "a":
+        gops.setAngle(
+          selectedNodes.value.filter(
+            n => ["x", "z"].includes(graphStore.nodes[n].zxType)
+          ),
+          panelStore.angleToSet
+        );
+        break;
+      default:
+        break;
+    }
+  } else {
+    switch (code) {
+      default:
+        break;
+    }
   }
 };
 
 const selectedNodes = ref([]);
 const selectedEdges = ref([]);
+const markedNodes = ref({ a: [], b: [] });
 </script>
 
 <template>
-  <TheGraphView @pan-start="panstart" @pan-stop="panstop" />
+  <TheGraphView
+    v-model:selectedNodes="selectedNodes"
+    v-model:selectedEdges="selectedEdges"
+    v-model:markedNodes="markedNodes"
+    @pan-start="panstart"
+    @pan-stop="panstop"
+  />
   <ThePanelOverlay
     :class="{ 'panel-inactive': overlayInactive }"
     @command="command"

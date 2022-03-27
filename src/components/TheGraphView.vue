@@ -5,7 +5,7 @@ import { useStyleStore } from "@/stores/graphStyle.js";
 import { useGraphStore } from "@/stores/graph.js";
 
 const panelStore = usePanelStore();
-const graphStyle = useStyleStore();
+const styleStore = useStyleStore();
 const graphStore = useGraphStore();
 
 // Catch pan start/stop events
@@ -23,8 +23,21 @@ const eventHandlers = {
   },
 };
 
+// Register properties
+const props = defineProps({
+  selectedNodes: Array,
+  selectedEdges: Array,
+  markedNodes: Object,
+});
+
 // Register emit events
-const emit = defineEmits(["pan-start", "pan-stop"]);
+const emit = defineEmits([
+  "pan-start",
+  "pan-stop",
+  "update:selectedNodes",
+  "update:selectedEdges",
+  "update:markedNodes",
+]);
 </script>
 
 <template>
@@ -38,7 +51,12 @@ const emit = defineEmits(["pan-start", "pan-stop"]);
     :edges="graphStore.edges"
     :paths="graphStore.paths"
     :layouts="graphStore.layouts"
-    :configs="graphStyle"
+    :selected-nodes="selectedNodes"
+    :selected-edges="selectedEdges"
+    @update:selected-nodes="v => emit('update:selectedNodes', v)"
+    @update:selected-edges="v => emit('update:selectedEdges', v)"
+    :configs="styleStore"
+    v-model:zoom-level="styleStore.extra.zoomLevel"
     :event-handlers="eventHandlers"
   />
   <div class="test"></div>
