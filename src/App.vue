@@ -21,28 +21,54 @@ const panstop = () => {
 
 // Catch key strokes
 onBeforeMount(() => {
+  window.addEventListener("keydown", keydown);
   window.addEventListener("keyup", keyup);
 });
 onBeforeUnmount(() => {
+  window.removeEventListener("keydown", keydown);
   window.removeEventListener("keyup", keyup);
 });
+let metaKey = false; // Meta key  is not treated as a modifier by browsers
+const keydown = (e) => {
+  if (e.key === "Meta") {
+    metaKey = true;
+  }
+};
 const keyup = (e) => {
+  if (e.key === "Meta") {
+    metaKey = false;
+  }
   if (e.target instanceof HTMLInputElement) {
     return;
   }
-  if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+  let used = false;
+  if (!e.altKey && !e.ctrlKey && !e.metaKey && !metaKey) {
     let k = e.key;
     // Allow backspace or 'x'
     if (k === "Backspace") {
       k = e.shiftKey ? "X" : "x";
     }
-    command(k);
+    used = command(k);
+  } else if (metaKey || e.ctrlKey) {
+    if (e.which === 90 && !e.shiftKey) {
+      used = command("Undo");
+    } else if (
+      (e.which == 90 && e.shiftKey) ||
+      (e.which == 89 && !e.shiftKey)
+    ) {
+      used = command("Redo");
+    }
+  }
+  if (used) {
+    e.preventDefault();
+    e.stopPropagation();
   }
 };
 
 // Execute graph commands
 const command = (code) => {
   console.log(`Command: ${code}`);
+  let used = true;
   if (!panelStore.rewriteMode) {
     // Edit mode
     switch (code) {
@@ -72,25 +98,32 @@ const command = (code) => {
         gops.clearPathsByNodes(selectedEdges.value);
         break;
       default:
+        used = false;
         break;
     }
   } else {
     // Rewrite mode
     switch (code) {
       default:
+        used = false;
         break;
     }
   }
-  // All modes
-  switch (code) {
-    case "Escape":
-      // Clear selection
-      selectedEdges.value = [];
-      selectedNodes.value = [];
-      break;
-    default:
-      break;
+  if (!used) {
+    used = true;
+    // All modes
+    switch (code) {
+      case "Escape":
+        // Clear selection
+        selectedEdges.value = [];
+        selectedNodes.value = [];
+        break;
+      default:
+        used = false;
+        break;
+    }
   }
+  return used;
 };
 
 // Graph edit commands that adjust or use the selections before operating on the
