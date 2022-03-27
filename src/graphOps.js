@@ -131,8 +131,13 @@ export const _isEdgesValidPathHelper = (edgeIds, ignoreCurrent) => {
 };
 
 ////////// Graph queries //////////
-const nodesOfEdge = (edgeId) => {
+export const nodesOfEdge = (edgeId) => {
   return [graphStore.edges[edgeId].source, graphStore.edges[edgeId].target];
+};
+
+export const coordsOfNode = (nodeId) => {
+  const coords = graphStore.layouts.nodes[nodeId];
+  return [coords.x, coords.y];
 };
 
 // Calls callback for every edge that uses at least one node
@@ -194,6 +199,19 @@ export const forCompleteGraph = (nodeIds, callback) => {
   }
 };
 
+// Calls callback for every neighbor other than those in nodeIds
+export const forNodeCollectiveNeighborhood = (nodeIds, callback) => {
+  const nodeIdSet = nodeIds instanceof Set ? nodeIds : new Set(nodeIds);
+  for (let eid of Object.keys(graphStore.edges)) {
+    const [n1, n2] = nodesOfEdge(eid);
+    if (nodeIdSet.has(n1) && !nodeIdSet.has(n2)) {
+      callback(n2);
+    } else if (nodeIdSet.has(n2) && !nodeIdSet.has(n1)) {
+      callback(n1);
+    }
+  }
+};
+
 ////////// Graph subroutines //////////
 const nodePairString = (n1, n2) => {
   if (n1 <= n2) {
@@ -204,7 +222,7 @@ const nodePairString = (n1, n2) => {
 };
 
 ////////// Graph operations //////////
-export const addNode = (zxType) => {
+export const addNode = (zxType, x, y) => {
   assert(zxType, "required argument");
   let nodeId = `node${nextNodeIndex.value}`;
   while (graphStore.nodes[nodeId]) {
@@ -215,17 +233,19 @@ export const addNode = (zxType) => {
   graphStore.nodes[nodeId] = {
     zxType: zxType,
   };
-  graphStore.nodes = Object.assign(graphStore.nodes, {});
+  if (x !== undefined && y !== undefined) {
+    graphStore.layouts.nodes[nodeId] = { x: x, y: y };
+  }
   return nodeId;
 };
-export const addZNode = () => {
-  return addNode("z");
+export const addZNode = (x, y) => {
+  return addNode("z", x, y);
 };
-export const addXNode = () => {
-  return addNode("x");
+export const addXNode = (x, y) => {
+  return addNode("x", x, y);
 };
-export const addBoundaryNode = () => {
-  return addNode("boundary");
+export const addBoundaryNode = (x, y) => {
+  return addNode("boundary", x, y);
 };
 
 export const addEdge = (n1, n2, zxType) => {
@@ -247,15 +267,15 @@ export const addEdge = (n1, n2, zxType) => {
   return edgeId;
 };
 export const addNormalEdge = (n1, n2) => {
-  addEdge(n1, n2, "normal");
+  return addEdge(n1, n2, "normal");
 };
 export const addHadamardEdge = (n1, n2) => {
-  addEdge(n1, n2, "hadamard");
+  return addEdge(n1, n2, "hadamard");
 };
 
 // If zxType is undefined, uses normal edges only to boundary nodes
 // If zxType, enforces this type for removed edges
-export const toggleEdges = (nodeIds, zxType, clearOnly) => {
+export const toggleEdges = (nodeIds, zxType) => {
   const allEdges = graphStore.edges;
   const oldEdgeIds = new Set();
   const oldNodePairs = new Set();
@@ -276,34 +296,44 @@ export const toggleEdges = (nodeIds, zxType, clearOnly) => {
   });
   // Remove any dependent paths
   clearPathsByEdges(oldEdgeIds);
-  if (!clearOnly) {
-    // Add in the new edges
-    forCompleteGraph(nodeIds, (n1, n2) => {
-      if (!oldNodePairs.has(nodePairString(n1, n2))) {
-        // Add new edge
-        if (zxType) {
-          addEdge(n1, n2, zxType);
-        } else if (
-          graphStore.nodes[n1].zxType === "boundary" ||
-          graphStore.nodes[n2].zxType === "boundary"
-        ) {
-          addNormalEdge(n1, n2);
-        } else {
-          addHadamardEdge(n1, n2);
-        }
+  // Add in the new edges
+  forCompleteGraph(nodeIds, (n1, n2) => {
+    if (!oldNodePairs.has(nodePairString(n1, n2))) {
+      // Add new edge
+      if (zxType) {
+        addEdge(n1, n2, zxType);
+      } else if (
+        graphStore.nodes[n1].zxType === "boundary" ||
+        graphStore.nodes[n2].zxType === "boundary"
+      ) {
+        addNormalEdge(n1, n2);
+      } else {
+        addHadamardEdge(n1, n2);
       }
-    });
-  }
+    }
+  });
 };
-export const clearEdgesBetweenNodes = (nodeIds) => {
-  toggleEdges(nodeIds, undefined, true);
+export const clearEdgesBetweenNodes = (nodeIds, zxType) => {
+  forInnerEdgesOfNodes(nodeIds, (edgeId) => {
+    // Check matching edge type
+    if (zxType && zxType !== graphStore.edges[edgeId].zxType) {
+      throw new GraphOperationException(
+        "not allowed to toggle edges of different types"
+      );
+    }
+    // Remove existing edge
+    delete graphStore.edges[edgeId];
+  });
 };
 
-export const deleteEdges = (edges) => {
+export const deleteEdges = (edges, zxType) => {
   // Remove any dependent paths
-  forPathsOfEdges(edges);
+  clearPathsByEdges(edges);
   // Remove edges
   for (const edgeId of edges) {
+    if (zxType && zxType !== graphStore.edges[edgeId].zxType) {
+      throw new GraphOperationException("deleting edges of the wrong type");
+    }
     delete graphStore.edges[edgeId];
   }
 };
@@ -362,4 +392,30 @@ export const addPathByEdges = (edges) => {
   }
   nextPathIndex.value += 1;
   graphStore.paths[pathId] = { edges: orderedEdges };
+};
+
+export const insertNewNodesAlongEdge = (
+  edge,
+  count,
+  zxEdgeType,
+  zxNodeType
+) => {
+  const [n1, n2] = nodesOfEdge(edge);
+  const [x1, y1] = coordsOfNode(n1);
+  const [x2, y2] = coordsOfNode(n2);
+  deleteEdges([edge], zxEdgeType);
+  let prev = n1;
+  let node = n1;
+  const newNodes = [];
+  for (let i = 0; i < count; i++) {
+    const x = x1 + ((i + 1) * (x2 - x1)) / (count + 1);
+    const y = y1 + ((i + 1) * (y2 - y1)) / (count + 1);
+    node = addNode(zxNodeType || "z", x, y);
+    newNodes.push(node);
+    const auto = i === 0 && isBoundaryNode(n1) ? "normal" : "hadamard";
+    addEdge(prev, node, zxEdgeType || auto);
+  }
+  const auto = isBoundaryNode(n2) ? "normal" : "hadamard";
+  addEdge(node, n2, zxEdgeType || auto);
+  return newNodes;
 };

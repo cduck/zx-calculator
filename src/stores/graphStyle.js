@@ -166,6 +166,7 @@ export const useStyleStore = defineStore("graphStyle", {
       extra: reactive({
         zoomLevel: 1,
         snapTo: 0,
+        defaultOffset: 50,
       }),
     }),
 });

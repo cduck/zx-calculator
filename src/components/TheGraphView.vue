@@ -24,7 +24,8 @@ watch(styleStore.extra, (extra) => {
     delete styleStore.view.layoutHandler;
   } else {
     if (newSnap === true) {
-      newSnap = 12.5;
+      newSnap =
+        styleStore.extra.defaultOffset / styleStore.view.grid.thickIncrements;
     }
     if (!styleStore.view.layoutHandler) {
       styleStore.view.layoutHandler = new vng.GridLayout({ grid: newSnap });
