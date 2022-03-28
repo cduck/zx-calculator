@@ -1,14 +1,22 @@
 <script setup>
-import { ref, onBeforeMount, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeMount, onBeforeUnmount } from "vue";
 import TheGraphView from "@/components/TheGraphView.vue";
 import ThePanelOverlay from "@/components/ThePanelOverlay.vue";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
+import { useUndoStore } from "@/stores/undoHistory.js";
+import { useGraphStore } from "@/stores/graph.js";
 import * as gops from "@/graphOps";
 
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
+const undoStore = useUndoStore();
+const graphStore = useGraphStore();
 gops.graphOpsSetup();
+
+const selectedNodes = ref([]);
+const selectedEdges = ref([]);
+const markedNodes = ref({ a: [], b: [] });
 
 // Disable overlay panels while panning
 const overlayInactive = ref(false);
@@ -22,40 +30,26 @@ const panstop = () => {
 // Catch key strokes
 onBeforeMount(() => {
   window.addEventListener("keydown", keydown);
-  window.addEventListener("keyup", keyup);
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", keydown);
-  window.removeEventListener("keyup", keyup);
 });
-let metaKey = false; // Meta key  is not treated as a modifier by browsers
 const keydown = (e) => {
-  if (e.key === "Meta") {
-    metaKey = true;
-  }
-};
-const keyup = (e) => {
-  if (e.key === "Meta") {
-    metaKey = false;
-  }
   if (e.target instanceof HTMLInputElement) {
     return;
   }
   let used = false;
-  if (!e.altKey && !e.ctrlKey && !e.metaKey && !metaKey) {
-    let k = e.key;
+  let k = e.key;
+  if (!e.altKey && !e.ctrlKey && !e.metaKey) {
     // Allow backspace or 'x'
     if (k === "Backspace") {
       k = e.shiftKey ? "X" : "x";
     }
     used = command(k);
-  } else if (metaKey || e.ctrlKey) {
-    if (e.which === 90 && !e.shiftKey) {
+  } else if (e.metaKey ^ e.ctrlKey) {
+    if (k === "z" && !e.shiftKey) {
       used = command("Undo");
-    } else if (
-      (e.which == 90 && e.shiftKey) ||
-      (e.which == 89 && !e.shiftKey)
-    ) {
+    } else if ((k === "Z" && e.shiftKey) || (k === "y" && !e.shiftKey)) {
       used = command("Redo");
     }
   }
@@ -63,6 +57,61 @@ const keyup = (e) => {
     e.preventDefault();
     e.stopPropagation();
   }
+};
+
+// Undo/redo logic, accounting for nodes moved between edits
+onMounted(() => {
+  undoStore.addEntry(makeFullGraphStateCopy(), "init");
+  wereNodesMoved = false;
+});
+const makeFullGraphStateCopy = () => {
+  const data = graphStore.fullCopy();
+  data.selectedNodes = [...selectedNodes.value];
+  data.selectedEdges = [...selectedEdges.value];
+  return data;
+};
+const graphStateFullReplace = (data) => {
+  graphStore.fullReplace(data);
+  selectedNodes.value = [...data.selectedNodes];
+  selectedEdges.value = [...data.selectedEdges];
+  window.setTimeout(() => {
+    selectedNodes.value = [...data.selectedNodes]; // Hack fix
+    selectedEdges.value = [...data.selectedEdges];
+  }, 0);
+};
+let wereNodesMoved = false;
+const graphStateUndo = () => {
+  if (wereNodesMoved) {
+    undoStore.insertEntry(makeFullGraphStateCopy("move nodes"));
+    wereNodesMoved = false;
+  }
+  const data = undoStore.undo();
+  if (data) {
+    graphStateFullReplace(data);
+  }
+};
+const graphStateRedo = () => {
+  if (wereNodesMoved) {
+    undoStore.insertEntry(makeFullGraphStateCopy("move nodes"));
+    wereNodesMoved = false;
+  }
+  const data = undoStore.redo();
+  if (data) {
+    graphStateFullReplace(data);
+  }
+};
+const nodeMove = () => {
+  wereNodesMoved = true;
+};
+const recordBeforeGraphMod = () => {
+  if (wereNodesMoved) {
+    undoStore.addEntry(makeFullGraphStateCopy("move nodes"));
+    wereNodesMoved = false;
+  }
+};
+const recordAfterGraphMod = (name) => {
+  undoStore.addEntry(makeFullGraphStateCopy(name));
+  wereNodesMoved = false;
 };
 
 // Execute graph commands
@@ -73,29 +122,45 @@ const command = (code) => {
     // Edit mode
     switch (code) {
       case "n":
+        recordBeforeGraphMod();
         addZNodes();
+        recordAfterGraphMod("edit:add z nodes");
         break;
       case "b":
+        recordBeforeGraphMod();
         addBoundaryNodes();
+        recordAfterGraphMod("edit:add boundary nodes");
         break;
       case "e":
+        recordBeforeGraphMod();
         gops.toggleEdges(selectedNodes.value);
+        recordAfterGraphMod("edit:toggle edges");
         break;
       case "E":
+        recordBeforeGraphMod();
         gops.clearEdgesBetweenNodes(selectedNodes.value);
+        recordAfterGraphMod("edit:clear edges");
         break;
       case "x":
+        recordBeforeGraphMod();
         deleteSelection();
+        recordAfterGraphMod("edit: delete");
         break;
       case "a":
+        recordBeforeGraphMod();
         setNodeAngles();
+        recordAfterGraphMod("edit:set angle");
         break;
       case "s":
+        recordBeforeGraphMod();
         gops.addPathByEdges(selectedEdges.value);
+        recordAfterGraphMod("edit:add path");
         break;
       case "S":
+        recordBeforeGraphMod();
         gops.clearPathsByEdges(selectedEdges.value);
         gops.clearPathsByNodes(selectedEdges.value);
+        recordAfterGraphMod("edit:clear path");
         break;
       default:
         used = false;
@@ -117,6 +182,12 @@ const command = (code) => {
         // Clear selection
         selectedEdges.value = [];
         selectedNodes.value = [];
+        break;
+      case "Undo":
+        graphStateUndo();
+        break;
+      case "Redo":
+        graphStateRedo();
         break;
       default:
         used = false;
@@ -141,9 +212,7 @@ const addZNodes = () => {
     let x, y;
     if (selectedNodes.value.length > 0) {
       [x, y] = gops.coordsOfNode(selectedNodes.value[0]);
-      console.log(x, y);
       x += styleStore.extra.defaultOffset;
-      console.log(x, y);
     }
     const node = gops.addZNode(x, y);
     // For convenience, connect each previously selected node to the new node
@@ -192,9 +261,7 @@ const deleteSelection = () => {
   } else {
     // Delete edges and select their nodes
     const select = [];
-    console.log(selectedEdges.value);
     for (const edge of selectedEdges.value) {
-      console.log(edge);
       select.push(...gops.nodesOfEdge(edge));
     }
     gops.deleteEdges(selectedEdges.value);
@@ -209,10 +276,6 @@ const setNodeAngles = () => {
     panelStore.angleToSet
   );
 };
-
-const selectedNodes = ref([]);
-const selectedEdges = ref([]);
-const markedNodes = ref({ a: [], b: [] });
 </script>
 
 <template>
@@ -222,6 +285,7 @@ const markedNodes = ref({ a: [], b: [] });
     v-model:markedNodes="markedNodes"
     @pan-start="panstart"
     @pan-stop="panstop"
+    @node-move="nodeMove"
   />
   <ThePanelOverlay
     :class="{ 'panel-inactive': overlayInactive }"

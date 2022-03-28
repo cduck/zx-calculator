@@ -357,7 +357,10 @@ export const deleteNodes = (nodes) => {
 export const setAngle = (nodes, angle) => {
   for (const nodeId of nodes) {
     if (angle) {
-      graphStore.nodes[nodeId].zxAngle = angle;
+      graphStore.nodes[nodeId] = {
+        ...graphStore.nodes[nodeId],
+        zxAngle: angle,
+      };
     } else {
       delete graphStore.nodes[nodeId].zxAngle;
     }
@@ -390,7 +393,7 @@ const newPathId = () => {
   }
   nextPathIndex.value += 1;
   return pathId;
-}
+};
 
 export const addPathByEdges = (edges) => {
   const orderedEdges = sortValidPathEdges(edges, true); // Throws if invalid

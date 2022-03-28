@@ -35,15 +35,16 @@ watch(styleStore.extra, (extra) => {
   }
 });
 
-// TODO
+// Graph event handers
 const eventHandlers = {
-  "...": (event) => {
-    console.log(event);
+  // Watch for node move event
+  "node:pointermove": (_, event) => {
+    emit("node-move", event);
   },
 };
 
 // Register properties
-const props = defineProps({
+defineProps({
   selectedNodes: Array,
   selectedEdges: Array,
   markedNodes: Object,
@@ -53,6 +54,7 @@ const props = defineProps({
 const emit = defineEmits([
   "pan-start",
   "pan-stop",
+  "node-move",
   "update:selectedNodes",
   "update:selectedEdges",
   "update:markedNodes",

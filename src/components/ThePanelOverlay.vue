@@ -40,6 +40,7 @@ const emit = defineEmits(["command"]);
             active-text="Rewrite"
             inactive-color="#eb0"
           />
+          <div class="panel-top-right"><div>0.0.1 Alpha</div></div>
         </div>
       </div>
     </Transition>
@@ -295,5 +296,12 @@ const emit = defineEmits(["command"]);
 .sld {
   padding-left: 10px;
   padding-right: 10px;
+}
+.panel-top-right {
+  height: 100%;
+  display: flex;
+  justify-content: right;
+  align-items: center;
+  flex-grow: 1;
 }
 </style>
