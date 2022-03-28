@@ -382,16 +382,20 @@ export const clearPathsByNodes = (nodes) => {
   clearPathsByEdges(oldEdges);
 };
 
-export const addPathByEdges = (edges) => {
-  const orderedEdges = sortValidPathEdges(edges, true); // Throws if invalid
-  clearPathsByEdges(edges);
+const newPathId = () => {
   let pathId = `edge${nextPathIndex.value}`;
   while (graphStore.paths[pathId]) {
     nextPathIndex.value *= 2;
     pathId = `edge${nextPathIndex.value}`;
   }
   nextPathIndex.value += 1;
-  graphStore.paths[pathId] = { edges: orderedEdges };
+  return pathId;
+}
+
+export const addPathByEdges = (edges) => {
+  const orderedEdges = sortValidPathEdges(edges, true); // Throws if invalid
+  clearPathsByEdges(edges);
+  graphStore.paths[newPathId()] = { edges: orderedEdges };
 };
 
 export const insertNewNodesAlongEdge = (
@@ -403,19 +407,60 @@ export const insertNewNodesAlongEdge = (
   const [n1, n2] = nodesOfEdge(edge);
   const [x1, y1] = coordsOfNode(n1);
   const [x2, y2] = coordsOfNode(n2);
-  deleteEdges([edge], zxEdgeType);
   let prev = n1;
   let node = n1;
   const newNodes = [];
+  const newEdges = [];
   for (let i = 0; i < count; i++) {
     const x = x1 + ((i + 1) * (x2 - x1)) / (count + 1);
     const y = y1 + ((i + 1) * (y2 - y1)) / (count + 1);
     node = addNode(zxNodeType || "z", x, y);
     newNodes.push(node);
     const auto = i === 0 && isBoundaryNode(n1) ? "normal" : "hadamard";
-    addEdge(prev, node, zxEdgeType || auto);
+    const e = addEdge(prev, node, zxEdgeType || auto);
+    newEdges.push(e);
   }
   const auto = isBoundaryNode(n2) ? "normal" : "hadamard";
-  addEdge(node, n2, zxEdgeType || auto);
+  const e = addEdge(node, n2, zxEdgeType || auto);
+  newEdges.push(e);
+  substitutePathEdge(edge, newEdges);
+  deleteEdges([edge], zxEdgeType);
   return newNodes;
+};
+
+export const substitutePathEdge = (edgeId, newOrderedEdges) => {
+  assert(newOrderedEdges.length > 0, "array argument must be non-empty");
+  for (const pathId of Object.keys(graphStore.paths)) {
+    const pathEdges = graphStore.paths[pathId].edges;
+    const i = pathEdges.indexOf(edgeId);
+    if (i >= 0) {
+      // This path contains the edge
+      // Check what order to insert newOrderedEdges
+      if (i == 0) {
+        // Special case for the first edge
+        // Check which end of the new edges the earlier edge matches with
+        const [n1, n2] = nodesOfEdge(pathEdges[i + 1]);
+        const [n3, n4] = nodesOfEdge(
+          newOrderedEdges[newOrderedEdges.length - 1]
+        );
+        if (n1 === n3 || n1 === n4 || n2 === n3 || n2 === n4) {
+          pathEdges.splice(i, 1, ...newOrderedEdges);
+        } else {
+          pathEdges.splice(i, 1, ...newOrderedEdges.reverse());
+        }
+      } else {
+        // Check which end of the new edges the earlier edge matches with
+        const [n1, n2] = nodesOfEdge(pathEdges[i - 1]);
+        const [n3, n4] = nodesOfEdge(newOrderedEdges[0]);
+        if (n1 === n3 || n1 === n4 || n2 === n3 || n2 === n4) {
+          pathEdges.splice(i, 1, ...newOrderedEdges);
+        } else {
+          pathEdges.splice(i, 1, ...newOrderedEdges.reverse());
+        }
+      }
+      // Set as new path
+      delete graphStore.paths[pathId];
+      graphStore.paths[newPathId()] = { edges: pathEdges };
+    }
+  }
 };
