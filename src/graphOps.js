@@ -169,7 +169,7 @@ export const isNodeNearBoundary = (nodeId) => {
 };
 
 // Calls callback for every edge that uses at least one node
-const forEdgesOfNodes = (nodeIds, callback) => {
+export const forEdgesOfNodes = (nodeIds, callback) => {
   const nodeIdSet = nodeIds instanceof Set ? nodeIds : new Set(nodeIds);
   const edges = graphStore.edges;
   for (const edgeId of Object.keys(edges)) {
@@ -183,7 +183,7 @@ const forEdgesOfNodes = (nodeIds, callback) => {
 };
 
 // Calls callback for every edge that uses at least two nodes
-const forInnerEdgesOfNodes = (nodeIds, callback) => {
+export const forInnerEdgesOfNodes = (nodeIds, callback) => {
   const nodeIdSet = nodeIds instanceof Set ? nodeIds : new Set(nodeIds);
   const edges = graphStore.edges;
   for (const edgeId of Object.keys(edges)) {

@@ -201,7 +201,13 @@ const checkCanDoCommand = {
   n: ref(true),
   b: ref(true),
   e: computed(() => selectedNodes.value.length >= 2),
-  E: computed(() => selectedNodes.value.length >= 2),
+  E: computed(() => {
+    let anyEdges = false;
+    gops.forInnerEdgesOfNodes(selectedNodes.value, () => {
+      anyEdges = true;
+    });
+    return anyEdges;
+  }),
   x: computed(
     () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
   ),
