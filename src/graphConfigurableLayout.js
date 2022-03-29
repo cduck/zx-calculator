@@ -28,82 +28,87 @@ export class ConfigurableLayout {
   onDeactivate() {}
 
   activate(parameters) {
-    const { layouts, nodes, configs, emitter, scale, svgPanZoom } = parameters;
+    this.getParameters = () => parameters;
+    const { nodes, emitter } = parameters;
 
-    const onDrag = (positions) => {
-      for (const [id, pos] of Object.entries(positions)) {
-        const layout = this.getOrCreateNodePosition(layouts, id);
-        // TODO?
-        // Decide if this node is fixed in force layout
-        if (this.options.fixBoundaries) {
-          //////Object.assign(layout.value, {fixed: layout.value.fixed || nodes.value[id].zxType === "boundary");
-        }
-        this.snapPosition(pos);
-        this.setNodePosition(layout, pos);
-      }
-    };
-
-    const setNewNodePositions = (nodeIds) => {
-      // Set the positions of newly added nodes
-      const area = svgPanZoom.getViewArea();
-      const s = scale.value;
-      for (const nodeId of nodeIds) {
-        if (nodeId in layouts) continue;
-        // New node
-        const node = nodes.value[nodeId];
-        const nodeSize = getNodeSize(node, configs.node, s);
-        const candidate =
-          this.snapPosition({ ...area.center }, this.options.distance);
-        find_pos: for (;;) {
-          let collision = false;
-          collide: for (const [id, pos] of Object.entries(layouts)) {
-            if (nodeId === id) continue;
-            const targetNode = nodes.value[id];
-            if (!targetNode) continue;
-            const targetNodeSize = getNodeSize(targetNode, configs.node, s);
-            if (areNodesCollision(candidate, nodeSize, pos, targetNodeSize)) {
-              collision = true;
-              break collide;
-            }
-          }
-          if (collision) {
-            candidate.x += this.options.distance;
-            this.snapPosition(candidate, this.options.distance);
-            if (candidate.x + nodeSize.width / 2 > area.box.right) {
-              candidate.x = area.center.x;
-              candidate.y += this.options.DEFAULT_OPTIONS;
-              this.snapPosition(candidate, this.options.distance);
-            }
-          } else {
-            break find_pos;
-          }
-        }
-        const layout = this.getOrCreateNodePosition(layouts, nodeId);
-        this.setNodePosition(layout, candidate);
-      }
-    };
-
-    setNewNodePositions(Object.keys(nodes.value));
-    const stopNodeWatch = watch(
+    this.setNewNodePositions(Object.keys(nodes.value));
+    this.stopNodeWatch = watch(
       () => Object.keys(nodes.value),
-      setNewNodePositions
+      (nids) => this.setNewNodePositions(nids)
     );
 
-    emitter.on("node:dragstart", onDrag);
-    emitter.on("node:pointermove", onDrag);
-    emitter.on("node:dragend", onDrag);
+    this.onDragCallback = (ps) => this.onDrag(ps);
+    emitter.on("node:dragstart", this.onDragCallback);
+    emitter.on("node:pointermove", this.onDragCallback);
+    emitter.on("node:dragend", this.onDragCallback);
+  }
 
-    this.onDeactivate = () => {
-      stopNodeWatch();
-      emitter.off("node:dragstart", onDrag);
-      emitter.off("node:pointermove", onDrag);
-      emitter.off("node:dragend", onDrag);
-    };
+  onDrag(positions) {
+    const { layouts } = this.getParameters();
+    for (const [id, pos] of Object.entries(positions)) {
+      const layout = this.getOrCreateNodePosition(layouts, id);
+      // TODO?
+      // Decide if this node is fixed in force layout
+      if (this.options.fixBoundaries) {
+        //////Object.assign(layout.value, {fixed: layout.value.fixed || nodes.value[id].zxType === "boundary");
+      }
+      this.snapPosition(pos);
+      this.setNodePosition(layout, pos);
+    }
+  }
+
+  setNewNodePositions(nodeIds) {
+    const { layouts, nodes, configs, scale, svgPanZoom } = this.getParameters();
+    // Set the positions of newly added nodes
+    const area = svgPanZoom.getViewArea();
+    const s = scale.value;
+    for (const nodeId of nodeIds) {
+      if (nodeId in layouts) continue;
+      // New node
+      const node = nodes.value[nodeId];
+      const nodeSize = getNodeSize(node, configs.node, s);
+      const candidate = this.snapPosition(
+        { ...area.center },
+        this.options.distance
+      );
+      find_pos: for (;;) {
+        let collision = false;
+        collide: for (const [id, pos] of Object.entries(layouts)) {
+          if (nodeId === id) continue;
+          const targetNode = nodes.value[id];
+          if (!targetNode) continue;
+          const targetNodeSize = getNodeSize(targetNode, configs.node, s);
+          if (areNodesCollision(candidate, nodeSize, pos, targetNodeSize)) {
+            collision = true;
+            break collide;
+          }
+        }
+        if (collision) {
+          candidate.x += this.options.distance;
+          this.snapPosition(candidate, this.options.distance);
+          if (candidate.x + nodeSize.width / 2 > area.box.right) {
+            candidate.x = area.center.x;
+            candidate.y += this.options.DEFAULT_OPTIONS;
+            this.snapPosition(candidate, this.options.distance);
+          }
+        } else {
+          break find_pos;
+        }
+      }
+      const layout = this.getOrCreateNodePosition(layouts, nodeId);
+      this.setNodePosition(layout, candidate);
+    }
   }
 
   deactivate() {
-    if (this.onDeactivate) {
-      this.onDeactivate();
+    const { emitter } = this.getParameters();
+    if (this.stopNodeWatch) {
+      this.stopNodeWatch();
+    }
+    if (emitter && this.onDragCallback) {
+      emitter.off("node:dragstart", this.onDragCallback);
+      emitter.off("node:pointermove", this.onDragCallback);
+      emitter.off("node:dragend", this.onDragCallback);
     }
   }
 
