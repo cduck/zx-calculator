@@ -1,6 +1,7 @@
 <script setup>
-import { watch } from "vue";
+import { watch, computed, onMounted } from "vue";
 import * as vng from "v-network-graph";
+import { ConfigurableLayout } from "@/graphConfigurableLayout.js";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
 import { useGraphStore } from "@/stores/graph.js";
@@ -18,21 +19,8 @@ const mouseup = function (event) {
 };
 
 // Watch and update grid snap settings
-watch(styleStore.extra, (extra) => {
-  let newSnap = extra.snapTo;
-  if (!newSnap) {
-    delete styleStore.view.layoutHandler;
-  } else {
-    if (newSnap === true) {
-      newSnap =
-        styleStore.extra.defaultOffset / styleStore.view.grid.thickIncrements;
-    }
-    if (!styleStore.view.layoutHandler) {
-      styleStore.view.layoutHandler = new vng.GridLayout({ grid: newSnap });
-    } else {
-      styleStore.view.layoutHandler.grid = newSnap;
-    }
-  }
+onMounted(() => {
+  styleStore.view.layoutHandler = new ConfigurableLayout(styleStore.layout);
 });
 
 // Graph event handers

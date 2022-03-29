@@ -212,7 +212,7 @@ const addZNodes = () => {
     let x, y;
     if (selectedNodes.value.length > 0) {
       [x, y] = gops.coordsOfNode(selectedNodes.value[0]);
-      x += styleStore.extra.defaultOffset;
+      x += styleStore.layout.distance;
     }
     const node = gops.addZNode(x, y);
     // For convenience, connect each previously selected node to the new node
@@ -233,7 +233,7 @@ const addBoundaryNodes = () => {
     const edges = [];
     for (const n of selectedNodes.value) {
       let [x, y] = gops.coordsOfNode(n);
-      x += styleStore.extra.defaultOffset;
+      x += styleStore.layout.distance;
       const node = gops.addBoundaryNode(x, y);
       edges.push(gops.addNormalEdge(n, node));
       selectedNodes.value = [];

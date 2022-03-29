@@ -64,7 +64,7 @@ export const useStyleStore = defineStore("graphStyle", {
     defineConfigs({
       // https://dash14.github.io/v-network-graph/reference.html#configurations
       view: reactive({
-        scalingObjects: false,
+        scalingObjects: true,
         panEnabled: true,
         zoomEnabled: true,
         minZoomLevel: 0.1,
@@ -163,10 +163,16 @@ export const useStyleStore = defineStore("graphStyle", {
           color: "rgba(0,100,255,0.2)",
         },
       }),
+      layout: reactive({
+        snapToGrid: false,
+        grid: 10,
+        distance: 50,
+        forceLayout: false,
+        fixBoundaries: true,
+        newNodePositionMargin: 0, // Defaults to "distance"
+      }),
       extra: reactive({
         zoomLevel: 1,
-        snapTo: 0,
-        defaultOffset: 50,
       }),
     }),
 });
