@@ -51,5 +51,8 @@ export const useUndoStore = defineStore("undoHistory", {
     isTopOfHistory() {
       return this.currentIndex >= this.history.length - 1;
     },
+    isBottomOfHistory() {
+      return this.currentIndex <= 0;
+    },
   },
 });

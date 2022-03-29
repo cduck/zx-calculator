@@ -39,7 +39,6 @@ export class ConfigurableLayout {
           //////Object.assign(layout.value, {fixed: layout.value.fixed || nodes.value[id].zxType === "boundary");
         }
         this.snapPosition(pos);
-        console.log(this.options.snapToGrid, this.options.grid, pos);
         this.setNodePosition(layout, pos);
       }
     };
@@ -67,7 +66,6 @@ export class ConfigurableLayout {
             }
           }
           if (collision) {
-            console.log(this.options.distance);
             candidate.x += this.options.distance;
             this.snapPosition(candidate);
             if (candidate.x + nodeSize.width / 2 > area.box.right) {

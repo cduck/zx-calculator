@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeMount, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeMount, onBeforeUnmount } from "vue";
 import TheGraphView from "@/components/TheGraphView.vue";
 import ThePanelOverlay from "@/components/ThePanelOverlay.vue";
 import { usePanelStore } from "@/stores/panels.js";
@@ -62,7 +62,7 @@ const keydown = (e) => {
 // Undo/redo logic, accounting for nodes moved between edits
 onMounted(() => {
   undoStore.addEntry(makeFullGraphStateCopy(), "init");
-  wereNodesMoved = false;
+  wereNodesMoved.value = false;
 });
 const makeFullGraphStateCopy = () => {
   const data = graphStore.fullCopy();
@@ -79,11 +79,11 @@ const graphStateFullReplace = (data) => {
     selectedEdges.value = [...data.selectedEdges];
   }, 0);
 };
-let wereNodesMoved = false;
+let wereNodesMoved = ref(false);
 const graphStateUndo = () => {
-  if (wereNodesMoved) {
+  if (wereNodesMoved.value) {
     undoStore.insertEntry(makeFullGraphStateCopy("move nodes"));
-    wereNodesMoved = false;
+    wereNodesMoved.value = false;
   }
   const data = undoStore.undo();
   if (data) {
@@ -91,9 +91,9 @@ const graphStateUndo = () => {
   }
 };
 const graphStateRedo = () => {
-  if (wereNodesMoved) {
+  if (wereNodesMoved.value) {
     undoStore.insertEntry(makeFullGraphStateCopy("move nodes"));
-    wereNodesMoved = false;
+    wereNodesMoved.value = false;
   }
   const data = undoStore.redo();
   if (data) {
@@ -101,17 +101,17 @@ const graphStateRedo = () => {
   }
 };
 const nodeMove = () => {
-  wereNodesMoved = true;
+  wereNodesMoved.value = true;
 };
 const recordBeforeGraphMod = () => {
-  if (wereNodesMoved) {
+  if (wereNodesMoved.value) {
     undoStore.addEntry(makeFullGraphStateCopy("move nodes"));
-    wereNodesMoved = false;
+    wereNodesMoved.value = false;
   }
 };
 const recordAfterGraphMod = (name) => {
   undoStore.addEntry(makeFullGraphStateCopy(name));
-  wereNodesMoved = false;
+  wereNodesMoved.value = false;
 };
 
 // Execute graph commands
@@ -195,6 +195,30 @@ const command = (code) => {
     }
   }
   return used;
+};
+const checkCanDoCommand = {
+  n: true,
+  b: true,
+  e: computed(() => selectedNodes.value.length >= 2),
+  E: computed(() => selectedNodes.value.length >= 2),
+  x: computed(
+    () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
+  ),
+  a: computed(() => selectedNodes.value.length >= 1),
+  s: computed(() => gops.isEdgesValidPath(selectedEdges.value, true)),
+  S: computed(() => {
+    // Check if any edges are on a path
+    let canDo = false;
+    gops.forPathsOfEdges(selectedEdges.value, () => {
+      canDo = true;
+    });
+    return canDo;
+  }),
+  Escape: computed(
+    () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
+  ),
+  Undo: computed(() => !undoStore.isBottomOfHistory() || wereNodesMoved.value),
+  Redo: computed(() => !undoStore.isTopOfHistory()),
 };
 
 // Graph edit commands that adjust or use the selections before operating on the
@@ -289,6 +313,7 @@ const setNodeAngles = () => {
   />
   <ThePanelOverlay
     :class="{ 'panel-inactive': overlayInactive }"
+    :checkCanDoCommand="checkCanDoCommand"
     @command="command"
   />
 </template>

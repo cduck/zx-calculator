@@ -1,6 +1,5 @@
 <script setup>
-import { watch, computed, onMounted } from "vue";
-import * as vng from "v-network-graph";
+import { onMounted } from "vue";
 import { ConfigurableLayout } from "@/graphConfigurableLayout.js";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";

@@ -15,6 +15,9 @@ const show = ref(true);
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 
+const props = defineProps({
+  checkCanDoCommand: Object,
+});
 const emit = defineEmits(["command"]);
 </script>
 
@@ -33,7 +36,9 @@ const emit = defineEmits(["command"]);
     <Transition name="panel-top">
       <div class="panelx panel-top" v-show="show">
         <div>
-          <ElButton @click="show = !show" class="btn" style="width: 7ch">Hide</ElButton>
+          <ElButton class="btn" style="width: 7ch" @click="show = !show">
+            Hide
+          </ElButton>
           <ElSwitch
             v-model="panelStore.rewriteMode"
             inactive-text="Edit"
@@ -41,8 +46,20 @@ const emit = defineEmits(["command"]);
             inactive-color="#eb0"
           />
           <div class="btn-row-group">
-            <ElButton @click="emit('command', 'Undo')" class="btn">Undo</ElButton>
-            <ElButton @click="emit('command', 'Redo')" class="btn">Redo</ElButton>
+            <ElButton
+              class="btn"
+              @click="emit('command', 'Undo')"
+              :disabled="!props.checkCanDoCommand.Undo.value"
+            >
+              Undo
+            </ElButton>
+            <ElButton
+              class="btn"
+              @click="emit('command', 'Redo')"
+              :disabled="!props.checkCanDoCommand.Redo.value"
+            >
+              Redo
+            </ElButton>
           </div>
           <div class="panel-top-right"><div>0.0.1 Alpha</div></div>
         </div>
@@ -55,21 +72,54 @@ const emit = defineEmits(["command"]);
         <div>
           Select nodes:
           <ElTooltip content="Toggle edges on selected nodes [E]">
-            <ElButton class="btn" @click="emit('command', 'e')">Toggle Edges</ElButton>
+            <ElButton
+              class="btn"
+              @click="emit('command', 'e')"
+              :disabled="!props.checkCanDoCommand.e.value"
+            >
+              Toggle Edges
+            </ElButton>
           </ElTooltip>
-          <ElTooltip content="Toggle edges on selected nodes [Shift+E]">
-            <ElButton class="btn" @click="emit('command', 'E')">Clear Edges</ElButton>
+          <ElTooltip content="Clear edges on selected nodes [Shift+E]">
+            <ElButton
+              class="btn"
+              @click="emit('command', 'E')"
+              :disabled="!props.checkCanDoCommand.E.value"
+            >
+              Clear Edges
+            </ElButton>
           </ElTooltip>
-          <ElInput v-model="panelStore.angleToSet" placeholder="Node angle (i.e. \pi)" />
+          <ElInput
+            v-model="panelStore.angleToSet"
+            placeholder="Node angle (i.e. \pi)"
+          />
           <ElTooltip content="Sets the angle parameter of selected nodes [A]">
-            <ElButton class="btn" @click="emit('command', 'a')">Set Angle</ElButton>
+            <ElButton
+              class="btn"
+              @click="emit('command', 'a')"
+              :disabled="!props.checkCanDoCommand.a.value"
+            >
+              Set Angle
+            </ElButton>
           </ElTooltip>
           No selection:
           <ElTooltip content="Create a boundary node [B]">
-            <ElButton class="btn" @click="emit('command', 'b')">New Boundary</ElButton>
+            <ElButton
+              class="btn"
+              @click="emit('command', 'b')"
+              :disabled="!props.checkCanDoCommand.b.value"
+            >
+              New Boundary
+            </ElButton>
           </ElTooltip>
           <ElTooltip content="Create a Z node [N]">
-            <ElButton class="btn" @click="emit('command', 'n')">New Node</ElButton>
+            <ElButton
+              class="btn"
+              @click="emit('command', 'n')"
+              :disabled="!props.checkCanDoCommand.n.value"
+            >
+              New Node
+            </ElButton>
           </ElTooltip>
           Any selection:
           <ElTooltip content="Delete selected nodes or edges [X]">
