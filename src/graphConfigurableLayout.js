@@ -52,7 +52,8 @@ export class ConfigurableLayout {
         // New node
         const node = nodes.value[nodeId];
         const nodeSize = getNodeSize(node, configs.node, s);
-        const candidate = this.snapPosition({ ...area.center });
+        const candidate =
+          this.snapPosition({ ...area.center }, this.options.distance);
         find_pos: for (;;) {
           let collision = false;
           collide: for (const [id, pos] of Object.entries(layouts)) {
@@ -67,11 +68,11 @@ export class ConfigurableLayout {
           }
           if (collision) {
             candidate.x += this.options.distance;
-            this.snapPosition(candidate);
+            this.snapPosition(candidate, this.options.distance);
             if (candidate.x + nodeSize.width / 2 > area.box.right) {
               candidate.x = area.center.x;
               candidate.y += this.options.DEFAULT_OPTIONS;
-              this.snapPosition(candidate);
+              this.snapPosition(candidate, this.options.distance);
             }
           } else {
             break find_pos;
@@ -119,12 +120,11 @@ export class ConfigurableLayout {
     return layout;
   }
 
-  snapPosition(coord) {
-    if (this.options.snapToGrid) {
-      coord.x =
-        Math.floor(coord.x / this.options.grid + 0.5) * this.options.grid;
-      coord.y =
-        Math.floor(coord.y / this.options.grid + 0.5) * this.options.grid;
+  snapPosition(coord, forceGrid) {
+    if (forceGrid || this.options.snapToGrid) {
+      const grid = forceGrid || this.options.grid;
+      coord.x = Math.floor(coord.x / grid + 0.5) * grid;
+      coord.y = Math.floor(coord.y / grid + 0.5) * grid;
     }
     return coord;
   }

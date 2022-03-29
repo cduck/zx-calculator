@@ -165,7 +165,7 @@ export const useStyleStore = defineStore("graphStyle", {
       }),
       layout: reactive({
         snapToGrid: false,
-        grid: 10,
+        grid: 12.5,
         distance: 50,
         forceLayout: false,
         fixBoundaries: true,
