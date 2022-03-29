@@ -33,13 +33,17 @@ const emit = defineEmits(["command"]);
     <Transition name="panel-top">
       <div class="panelx panel-top" v-show="show">
         <div>
-          <ElButton @click="show = !show" style="width: 7ch">Hide</ElButton>
+          <ElButton @click="show = !show" class="btn" style="width: 7ch">Hide</ElButton>
           <ElSwitch
             v-model="panelStore.rewriteMode"
             inactive-text="Edit"
             active-text="Rewrite"
             inactive-color="#eb0"
           />
+          <div class="btn-row-group">
+            <ElButton @click="emit('command', 'Undo')" class="btn">Undo</ElButton>
+            <ElButton @click="emit('command', 'Redo')" class="btn">Redo</ElButton>
+          </div>
           <div class="panel-top-right"><div>0.0.1 Alpha</div></div>
         </div>
       </div>
@@ -129,7 +133,7 @@ const emit = defineEmits(["command"]);
             active-text="Grid"
           />
           <ElSwitch
-            v-model="styleStore.extra.snapTo"
+            v-model="styleStore.layout.snapToGrid"
             inactive-text=""
             active-text="Snap to grid"
           />
@@ -296,6 +300,9 @@ const emit = defineEmits(["command"]);
 .sld {
   padding-left: 10px;
   padding-right: 10px;
+}
+.btn-row-group > .btn:not(:first-child) {
+  margin-left: 5px;
 }
 .panel-top-right {
   height: 100%;
