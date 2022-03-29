@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "element-plus": "^2.1.5",
+    "mathjs": "^10.4.1",
     "pinia": "^2.0.12",
     "v-network-graph": "^0.5.7",
     "vue": "^3.2.31",
