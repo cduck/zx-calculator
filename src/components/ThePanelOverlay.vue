@@ -9,6 +9,7 @@ import {
 } from "element-plus";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
+import { version, versionKind } from "@/version.js";
 
 const show = ref(true);
 
@@ -61,7 +62,9 @@ const emit = defineEmits(["command"]);
               Redo
             </ElButton>
           </div>
-          <div class="panel-top-right"><div>0.0.1 Alpha</div></div>
+          <div class="panel-top-right">
+            <div class="version" :innerText="`${version} ${versionKind}`"></div>
+          </div>
         </div>
       </div>
     </Transition>
@@ -360,5 +363,8 @@ const emit = defineEmits(["command"]);
   justify-content: right;
   align-items: center;
   flex-grow: 1;
+}
+.version {
+  color: #999;
 }
 </style>
