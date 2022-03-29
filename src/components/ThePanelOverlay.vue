@@ -126,14 +126,34 @@ const emit = defineEmits(["command"]);
           </ElTooltip>
           Any selection:
           <ElTooltip content="Delete selected nodes or edges [X]">
-            <ElButton class="btn" @click="emit('command', 'x')">Delete</ElButton>
+            <ElButton
+              class="btn"
+              @click="emit('command', 'x')"
+              :disabled="!props.checkCanDoCommand.x.value"
+            >
+              Delete
+            </ElButton>
           </ElTooltip>
           Sequential edges:
           <ElTooltip content="Define a path from input to output boundary [S]">
-            <ElButton class="btn" @click="emit('command', 's')">Define Path</ElButton>
+            <ElButton
+              class="btn"
+              @click="emit('command', 's')"
+              :disabled="!props.checkCanDoCommand.s.value"
+            >
+              Define Path
+            </ElButton>
           </ElTooltip>
-          <ElTooltip content="Remove all paths touching selected edges [Shift+S]">
-            <ElButton class="btn" @click="emit('command', 'S')">Clear Path</ElButton>
+          <ElTooltip
+            content="Remove all paths touching selected edges [Shift+S]"
+          >
+            <ElButton
+              class="btn"
+              @click="emit('command', 'S')"
+              :disabled="!props.checkCanDoCommand.S.value"
+            >
+              Clear Path
+            </ElButton>
           </ElTooltip>
         </div>
       </div>
@@ -144,23 +164,63 @@ const emit = defineEmits(["command"]);
       <div class="panely panel-left" v-show="show && panelStore.rewriteMode">
         <div>
           Select single edge:
-          <ElTooltip content="Inserts two Hadamard edges by adding two Z nodes [Shift+H]">
-            <ElButton class="btn" @click="emit('command', 'H')">Edge -&gt; 2 Nodes</ElButton>
+          <ElTooltip
+            content="Inserts two Hadamard edges by adding two Z nodes [Shift+H]"
+          >
+            <ElButton
+              class="btn"
+              @click="emit('command', 'H')"
+              :disabled="!props.checkCanDoCommand.H.value"
+            >
+              Edge -&gt; 2 Nodes
+            </ElButton>
           </ElTooltip>
           Select single node:
-          <ElTooltip content="Removes a degree=2 node by merging its neighbors [H]">
-            <ElButton class="btn" @click="emit('command', 'h')">Remove degree-2</ElButton>
+          <ElTooltip
+            content="Removes a degree=2 node by merging its neighbors [H]"
+          >
+            <ElButton
+              class="btn"
+              @click="emit('command', 'h')"
+              :disabled="!props.checkCanDoCommand.h.value"
+            >
+              Remove degree-2
+            </ElButton>
           </ElTooltip>
-          <ElTooltip content="Removes a ±π/2 node by toggling all edges between its neighbors and adding ∓π/2 [C]">
-            <ElButton class="btn" @click="emit('command', 'c')">Complementation</ElButton>
+          <ElTooltip
+            content="Removes a ±π/2 node by toggling all edges between its neighbors and adding ∓π/2 [C]"
+          >
+            <ElButton
+              class="btn"
+              @click="emit('command', 'c')"
+              :disabled="!props.checkCanDoCommand.c.value"
+            >
+              Complementation
+            </ElButton>
           </ElTooltip>
           Select two nodes:
-          <ElTooltip content="Removes two nodes with angles 0 or π by toggling certain edges between their neighbors [P]">
-            <ElButton class="btn" @click="emit('command', 'p')">Pivot</ElButton>
+          <ElTooltip
+            content="Removes two nodes with angles 0 or π by toggling certain edges between their neighbors [P]"
+          >
+            <ElButton
+              class="btn"
+              @click="emit('command', 'p')"
+              :disabled="!props.checkCanDoCommand.p.value"
+            >
+              Pivot
+            </ElButton>
           </ElTooltip>
           Select multiple nodes:
-          <ElTooltip content="Adds a ±π/2 node connected to the selected nodes by toggling all edges and adding ±π/2 [Shift+C]">
-            <ElButton class="btn" @click="emit('command', 'C')">Complementation</ElButton>
+          <ElTooltip
+            content="Adds a ±π/2 node connected to the selected nodes by toggling all edges and adding ±π/2 [Shift+C]"
+          >
+            <ElButton
+              class="btn"
+              @click="emit('command', 'C')"
+              :disabled="!props.checkCanDoCommand.C.value"
+            >
+              Complementation
+            </ElButton>
           </ElTooltip>
           Reverse pivot:
           <ElRadioGroup v-model="panelStore.selectMode">
@@ -168,8 +228,16 @@ const emit = defineEmits(["command"]);
             <ElRadioButton label="">Both</ElRadioButton>
             <ElRadioButton label="B">B</ElRadioButton>
           </ElRadioGroup>
-          <ElTooltip content="Adds two nodes by toggling edges between three groups of selections (A, A+B, and B) [Shift+P]">
-            <ElButton class="btn" @click="emit('command', 'P')">Pivot</ElButton>
+          <ElTooltip
+            content="Adds two nodes by toggling edges between three groups of selections (A, A+B, and B) [Shift+P]"
+          >
+            <ElButton
+              class="btn"
+              @click="emit('command', 'P')"
+              :disabled="!props.checkCanDoCommand.P.value"
+            >
+              Pivot
+            </ElButton>
           </ElTooltip>
         </div>
       </div>

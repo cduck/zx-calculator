@@ -197,8 +197,9 @@ const command = (code) => {
   return used;
 };
 const checkCanDoCommand = {
-  n: true,
-  b: true,
+  // Edit mode
+  n: ref(true),
+  b: ref(true),
   e: computed(() => selectedNodes.value.length >= 2),
   E: computed(() => selectedNodes.value.length >= 2),
   x: computed(
@@ -214,6 +215,36 @@ const checkCanDoCommand = {
     });
     return canDo;
   }),
+  // Rewrite mode
+  h: computed(() => {
+    for (const node of selectedNodes.value) {
+      if (!gops.isNodeNearBoundary(node) && gops.degree(node) == 2) return true;
+    }
+    return false;
+  }),
+  H: computed(() => {
+    for (const node of selectedNodes.value) {
+      if (!gops.isNodeNearBoundary(node)) return true;
+    }
+    return false;
+  }),
+  c: computed(() => {
+    for (const node of selectedNodes.value) {
+      if (!gops.isNodeNearBoundary(node) && gops.nodeIsPlusMinusPi2(node)) {
+        return true;
+      }
+    }
+    return false;
+  }),
+  C: computed(() => selectedNodes.value.length >= 1),
+  p: computed(
+    () =>
+      selectedNodes.value.length == 2 &&
+      !gops.isNodeNearBoundary(selectedNodes.value[0]) &&
+      !gops.isNodeNearBoundary(selectedNodes.value[1])
+  ),
+  P: computed(() => false), // TODO: Check A, B, and A+B selections
+  // All modes
   Escape: computed(
     () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
   ),

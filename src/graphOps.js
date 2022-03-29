@@ -140,6 +140,34 @@ export const coordsOfNode = (nodeId) => {
   return [coords.x, coords.y];
 };
 
+export const degree = (nodeId) => {
+  let deg = 0;
+  forEdgesOfNodes([nodeId], () => {
+    deg += 1;
+  });
+  return deg;
+};
+
+export const nodeIsPlusMinusPi2 = (nodeId) => {
+  // TODO: Symbolic math
+  const angle = graphStore.nodes[nodeId].zxAngle;
+  return ["pi/2", "-pi/2", "π/2", "-π/2"].indexOf(angle) >= 0;
+};
+
+export const isNodeNearBoundary = (nodeId) => {
+  if (isBoundaryNode(nodeId)) {
+    // Shortcut if this node is a boundary
+    return true;
+  }
+  let near = false;
+  forNodeCollectiveNeighborhood([nodeId], (n) => {
+    if (isBoundaryNode(n)) {
+      near = true;
+    }
+  });
+  return near;
+};
+
 // Calls callback for every edge that uses at least one node
 const forEdgesOfNodes = (nodeIds, callback) => {
   const nodeIdSet = nodeIds instanceof Set ? nodeIds : new Set(nodeIds);
@@ -169,7 +197,7 @@ const forInnerEdgesOfNodes = (nodeIds, callback) => {
 };
 
 // Calls callback for every path that uses at least one edge
-const forPathsOfEdges = (edgeIds, callback) => {
+export const forPathsOfEdges = (edgeIds, callback) => {
   const paths = graphStore.paths;
   for (const pathId of Object.keys(paths)) {
     const pathEdgeSet = new Set(paths[pathId].edges);
