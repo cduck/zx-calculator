@@ -27,12 +27,12 @@ export const useUndoStore = defineStore("undoHistory", {
     updateEntry(dataCopy, name) {
       this.history[this.currentIndex] = { data: dataCopy, name: name };
     },
-    insertEntry(dataCopy, name) {
-      this.history.splice(this.currentIndex + 1, 0, {
+    insertEntry(dataCopy, name, offset) {
+      this.history.splice(this.currentIndex + 1 + (offset || 0), 0, {
         data: dataCopy,
         name: name,
       });
-      this.currentIndex += 1;
+      this.currentIndex += (offset || 0) <= 0;
     },
     undo() {
       if (this.currentIndex <= 0) {
@@ -47,6 +47,9 @@ export const useUndoStore = defineStore("undoHistory", {
       }
       this.currentIndex += 1;
       return this.history[this.currentIndex].data;
+    },
+    peek(offset) {
+      return this.history[this.currentIndex + offset]?.data;
     },
     isTopOfHistory() {
       return this.currentIndex >= this.history.length - 1;

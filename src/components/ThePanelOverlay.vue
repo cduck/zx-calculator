@@ -73,6 +73,13 @@ const emit = defineEmits(["command"]);
     <Transition name="panel-left">
       <div class="panely panel-left" v-show="show && !panelStore.rewriteMode">
         <div>
+          <ElButton
+            class="btn"
+            @click="emit('command', 'clear')"
+            :disabled="!props.checkCanDoCommand.clear.value"
+          >
+            Clear Graph
+          </ElButton>
           Select nodes:
           <ElTooltip content="Toggle edges on selected nodes [E]">
             <ElButton
@@ -163,6 +170,11 @@ const emit = defineEmits(["command"]);
     <Transition name="panel-left">
       <div class="panely panel-left" v-show="show && panelStore.rewriteMode">
         <div>
+          <ElTooltip content="For developer testing [`]">
+            <ElButton class="btn" @click="emit('command', '`')">
+              [Dev]
+            </ElButton>
+          </ElTooltip>
           Select single edge:
           <ElTooltip
             content="Inserts two Hadamard edges by adding two Z nodes [Shift+H]"

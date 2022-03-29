@@ -64,10 +64,13 @@ onMounted(() => {
   undoStore.addEntry(makeFullGraphStateCopy(), "init");
   wereNodesMoved.value = false;
 });
-const makeFullGraphStateCopy = () => {
+const makeFullGraphStateCopy = (recordMode) => {
   const data = graphStore.fullCopy();
   data.selectedNodes = [...selectedNodes.value];
   data.selectedEdges = [...selectedEdges.value];
+  if (recordMode) {
+    data.rewriteMode = !!panelStore.rewriteMode;
+  }
   return data;
 };
 const graphStateFullReplace = (data) => {
@@ -81,20 +84,44 @@ const graphStateFullReplace = (data) => {
 };
 let wereNodesMoved = ref(false);
 const graphStateUndo = () => {
+  // Save any changes to node positions without clearing redo history
   if (wereNodesMoved.value) {
-    undoStore.insertEntry(makeFullGraphStateCopy("move nodes"));
+    undoStore.insertEntry(makeFullGraphStateCopy(), "move nodes");
     wereNodesMoved.value = false;
   }
+  // Check if need to change mode before undoing
+  const peek = undoStore.peek(0);
+  if (
+    peek &&
+    (peek.rewriteMode === true || peek.rewriteMode === false) &&
+    peek.rewriteMode !== !!panelStore.rewriteMode
+  ) {
+    panelStore.rewriteMode = peek.rewriteMode;
+    return;
+  }
+  // Undo
   const data = undoStore.undo();
   if (data) {
     graphStateFullReplace(data);
   }
 };
 const graphStateRedo = () => {
+  // Save any changes to node positions without clearing redo history
   if (wereNodesMoved.value) {
-    undoStore.insertEntry(makeFullGraphStateCopy("move nodes"));
+    undoStore.insertEntry(makeFullGraphStateCopy(), "move nodes");
     wereNodesMoved.value = false;
   }
+  // Check if need to change mode before undoing
+  const peek = undoStore.peek(1);
+  if (
+    peek &&
+    (peek.rewriteMode === true || peek.rewriteMode === false) &&
+    peek.rewriteMode !== !!panelStore.rewriteMode
+  ) {
+    panelStore.rewriteMode = peek.rewriteMode;
+    return;
+  }
+  // Redo
   const data = undoStore.redo();
   if (data) {
     graphStateFullReplace(data);
@@ -105,12 +132,12 @@ const nodeMove = () => {
 };
 const recordBeforeGraphMod = () => {
   if (wereNodesMoved.value) {
-    undoStore.addEntry(makeFullGraphStateCopy("move nodes"));
+    undoStore.addEntry(makeFullGraphStateCopy(), "move nodes");
     wereNodesMoved.value = false;
   }
 };
 const recordAfterGraphMod = (name) => {
-  undoStore.addEntry(makeFullGraphStateCopy(name));
+  undoStore.addEntry(makeFullGraphStateCopy(true), name);
   wereNodesMoved.value = false;
 };
 
@@ -162,6 +189,11 @@ const command = (code) => {
         gops.clearPathsByNodes(selectedEdges.value);
         recordAfterGraphMod("edit:clear path");
         break;
+      case "clear":
+        recordBeforeGraphMod();
+        clearGraph();
+        recordAfterGraphMod("edit:clear");
+        break;
       default:
         used = false;
         break;
@@ -169,6 +201,12 @@ const command = (code) => {
   } else {
     // Rewrite mode
     switch (code) {
+      case "`":
+        // For developer testing
+        recordBeforeGraphMod();
+        addZNodes();
+        recordAfterGraphMod("rewrite:TEST");
+        break;
       default:
         used = false;
         break;
@@ -193,6 +231,16 @@ const command = (code) => {
         used = false;
         break;
     }
+  }
+  if (used) {
+    // Hack
+    // When the graph is modified and the last-pressed button becomes disabled,
+    // the button stops sending keydown events and all keyboard shortcuts stop
+    // working.
+    // This prevents that.
+    window.setTimeout(() => {
+      document.activeElement.disabled = false;
+    }, 0);
   }
   return used;
 };
@@ -221,6 +269,7 @@ const checkCanDoCommand = {
     });
     return canDo;
   }),
+  clear: computed(() => Object.keys(graphStore.nodes).length >= 1),
   // Rewrite mode
   h: computed(() => {
     for (const node of selectedNodes.value) {
@@ -329,6 +378,12 @@ const deleteSelection = () => {
     selectedEdges.value = [];
     selectedNodes.value = select;
   }
+};
+
+const clearGraph = () => {
+  gops.deleteNodes(Object.keys(graphStore.nodes));
+  selectedEdges.value = [];
+  selectedNodes.value = [];
 };
 
 const setNodeAngles = () => {
