@@ -167,9 +167,10 @@ export const useStyleStore = defineStore("graphStyle", {
         snapToGrid: false,
         grid: 12.5,
         distance: 50,
+        newNodePositionMargin: 0, // Defaults to "distance"
         forceLayout: false,
         fixBoundaries: true,
-        newNodePositionMargin: 0, // Defaults to "distance"
+        positionFixedByClickWithAltKey: false, // Doesn't really work yet
       }),
       extra: reactive({
         zoomLevel: 1,

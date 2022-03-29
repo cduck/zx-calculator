@@ -75,6 +75,7 @@ const makeFullGraphStateCopy = (recordMode) => {
 };
 const graphStateFullReplace = (data) => {
   graphStore.fullReplace(data);
+  styleStore.view.layoutHandler.networkChanged();
   selectedNodes.value = [...data.selectedNodes];
   selectedEdges.value = [...data.selectedEdges];
   window.setTimeout(() => {

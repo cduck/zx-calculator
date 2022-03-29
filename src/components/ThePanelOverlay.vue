@@ -259,6 +259,17 @@ const emit = defineEmits(["command"]);
     <Transition name="panel-right">
       <div class="panely panel-right" v-show="show">
         <div>
+          Force simulation:
+          <ElSwitch
+            v-model="styleStore.layout.forceLayout"
+            inactive-text=""
+            active-text="Relax nodes"
+          />
+          <ElSwitch
+            v-model="styleStore.layout.fixBoundaries"
+            inactive-text=""
+            active-text="Fix boundaries"
+          />
           View Settings:
           <ElSwitch
             v-model="styleStore.view.grid.visible"
