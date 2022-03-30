@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { ConfigurableLayout } from "@/graphConfigurableLayout.js";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
@@ -8,6 +8,8 @@ import { useGraphStore } from "@/stores/graph.js";
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 const graphStore = useGraphStore();
+
+const graph = ref(null);
 
 // Catch pan start/stop events
 const mousedown = function (event) {
@@ -20,6 +22,10 @@ const mouseup = function (event) {
 // Watch and update grid snap settings
 onMounted(() => {
   styleStore.view.layoutHandler = new ConfigurableLayout(styleStore.layout);
+  styleStore.graph = graph.value;
+});
+onUnmounted(() => {
+  delete styleStore.graph;
 });
 
 // Graph event handers
@@ -54,7 +60,6 @@ const emit = defineEmits([
     @mouseup="mouseup"
     @mouseout="mouseup"
     :class="{ 'main-graph': true, edit: !panelStore.rewriteMode }"
-    ref="graphElem"
     :nodes="graphStore.nodes"
     :edges="graphStore.edges"
     :paths="graphStore.paths"
@@ -66,6 +71,7 @@ const emit = defineEmits([
     :configs="styleStore"
     v-model:zoom-level="styleStore.extra.zoomLevel"
     :event-handlers="eventHandlers"
+    ref="graph"
   />
   <div class="test"></div>
 </template>

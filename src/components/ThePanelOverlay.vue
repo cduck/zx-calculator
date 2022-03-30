@@ -286,7 +286,7 @@ const emit = defineEmits(["command"]);
             inactive-text=""
             active-text="Scale nodes"
           />
-          <ElButton class="btn" @click="styleStore.extra.zoomLevel=1">Reset Zoom</ElButton>
+          <ElButton class="btn" @click="emit('command', 'resetView')">Reset View</ElButton>
         </div>
       </div>
     </Transition>

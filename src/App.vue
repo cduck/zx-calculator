@@ -217,6 +217,10 @@ const command = (code) => {
     used = true;
     // All modes
     switch (code) {
+      case "resetView":
+        styleStore.extra.zoomLevel = 1;
+        styleStore.graph?.panToCenter();
+        break;
       case "Escape":
         // Clear selection
         selectedEdges.value = [];
