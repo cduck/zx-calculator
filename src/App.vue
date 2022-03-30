@@ -264,7 +264,12 @@ const checkCanDoCommand = {
   x: computed(
     () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
   ),
-  a: computed(() => selectedNodes.value.length >= 1),
+  a: computed(() => {
+    for (const node of selectedNodes.value) {
+      if (!gops.isBoundaryNode(node)) return true;
+    }
+    return false;
+  }),
   s: computed(() => gops.isEdgesValidPath(selectedEdges.value, true)),
   S: computed(() => {
     // Check if any edges are on a path

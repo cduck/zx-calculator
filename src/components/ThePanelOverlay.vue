@@ -5,8 +5,9 @@ import {
   ElSwitch,
   ElTooltip,
   ElRadioButton,
-  ElInput,
+  ElAutocomplete,
 } from "element-plus";
+import { EditPen } from "@element-plus/icons-vue";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
 import { version, versionKind } from "@/version.js";
@@ -15,6 +16,22 @@ const show = ref(true);
 
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
+
+const angleSuggestions = (query, callback) => {
+  callback([
+    { value: "0" },
+    { value: "π" },
+    { value: "π/2" },
+    { value: "-π/2" },
+    { value: "π/4" },
+    { value: "-π/4" },
+    { value: "3π/4" },
+    { value: "-3π/4" },
+    { value: "α" },
+    { value: "β" },
+    { value: "γ" },
+  ]);
+};
 
 const props = defineProps({
   checkCanDoCommand: Object,
@@ -99,19 +116,27 @@ const emit = defineEmits(["command"]);
               Clear Edges
             </ElButton>
           </ElTooltip>
-          <ElInput
+          <ElAutocomplete
             v-model="panelStore.angleToSet"
-            placeholder="Node angle (i.e. \pi)"
-          />
-          <ElTooltip content="Sets the angle parameter of selected nodes [A]">
-            <ElButton
-              class="btn"
-              @click="emit('command', 'a')"
-              :disabled="!props.checkCanDoCommand.a.value"
-            >
-              Set Angle
-            </ElButton>
-          </ElTooltip>
+            placeholder="Set Angle"
+            :fetch-suggestions="angleSuggestions"
+            :trigger-on-focus="true"
+            clearable
+            class="inline-input"
+          >
+            <template #append>
+              <ElTooltip
+                content="Set the angle parameter of selected non-boundary nodes [A]"
+              >
+                <ElButton
+                  class="btn"
+                  @click="emit('command', 'a')"
+                  :disabled="!props.checkCanDoCommand.a.value"
+                  :icon="EditPen"
+                />
+              </ElTooltip>
+            </template>
+          </ElAutocomplete>
           No selection:
           <ElTooltip content="Create a boundary node [B]">
             <ElButton
