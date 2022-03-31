@@ -6,7 +6,8 @@ import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
 import { useUndoStore } from "@/stores/undoHistory.js";
 import { useGraphStore } from "@/stores/graph.js";
-import * as gops from "@/graphOps";
+import * as gops from "@/graphOps.js";
+import * as angles from "@/angles.js";
 
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
@@ -179,6 +180,11 @@ const command = (code) => {
         setNodeAngles();
         recordAfterGraphMod("edit:set angle");
         break;
+      case "A":
+        recordBeforeGraphMod();
+        addNodeAngles();
+        recordAfterGraphMod("edit:add angle");
+        break;
       case "s":
         recordBeforeGraphMod();
         gops.addPathByEdges(selectedEdges.value);
@@ -265,6 +271,15 @@ const checkCanDoCommand = {
     () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
   ),
   a: computed(() => {
+    for (const node of selectedNodes.value) {
+      if (!gops.isBoundaryNode(node)) return true;
+    }
+    return false;
+  }),
+  A: computed(() => {
+    if (!panelStore.angleToAdd) {
+      return false;
+    }
     for (const node of selectedNodes.value) {
       if (!gops.isBoundaryNode(node)) return true;
     }
@@ -397,10 +412,24 @@ const clearGraph = () => {
 };
 
 const setNodeAngles = () => {
-  gops.setAngle(
-    selectedNodes.value.filter((n) => !gops.isBoundaryNode(n)),
-    panelStore.angleToSet
-  );
+  const angle = angles.cleanInputStr(panelStore.angleToSet);
+  for (const n of selectedNodes.value) {
+    if (!gops.isBoundaryNode(n)) {
+      gops.setAngle(n, angle);
+    }
+  }
+};
+
+const addNodeAngles = () => {
+  const angle = angles.cleanInputStr(panelStore.angleToAdd);
+  if (!angle) {
+    return;
+  }
+  for (const n of selectedNodes.value) {
+    if (!gops.isBoundaryNode(n)) {
+      gops.addAngle(n, angle);
+    }
+  }
 };
 </script>
 

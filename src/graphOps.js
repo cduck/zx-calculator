@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { useGraphStore } from "@/stores/graph.js";
+import * as angles from "@/angles.js";
 
 let graphStore = null;
 
@@ -146,6 +147,10 @@ export const degree = (nodeId) => {
     deg += 1;
   });
   return deg;
+};
+
+export const angle = (nodeId) => {
+  return graphStore.nodes[nodeId].zxAngle ?? "0";
 };
 
 export const nodeIsPlusMinusPi2 = (nodeId) => {
@@ -403,17 +408,24 @@ export const deleteNodes = (nodes) => {
   }
 };
 
-export const setAngle = (nodes, angle) => {
-  for (const nodeId of nodes) {
-    if (angle) {
-      graphStore.nodes[nodeId] = {
-        ...graphStore.nodes[nodeId],
-        zxAngle: angle,
-      };
-    } else {
-      delete graphStore.nodes[nodeId].zxAngle;
-    }
+export const setAngle = (nodeId, angle) => {
+  // Allow casting comparison for "0"
+  if (angle && angle != 0) {
+    graphStore.nodes[nodeId] = {
+      ...graphStore.nodes[nodeId],
+      zxAngle: angle,
+    };
+  } else {
+    delete graphStore.nodes[nodeId].zxAngle;
   }
+};
+
+export const addAngle = (nodeId, a) => {
+  const old = angle(nodeId);
+  if (old && old !== "0") {
+    a = angles.angleStrSum(old, a);
+  }
+  setAngle(nodeId, a);
 };
 
 // Remove all paths dependent on these edges or shared nodes

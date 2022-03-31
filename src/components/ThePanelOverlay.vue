@@ -7,10 +7,11 @@ import {
   ElRadioButton,
   ElAutocomplete,
 } from "element-plus";
-import { EditPen } from "@element-plus/icons-vue";
+import { EditPen, Plus } from "@element-plus/icons-vue";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
 import { version, versionKind } from "@/version.js";
+import * as angles from "@/angles.js";
 
 const show = ref(true);
 
@@ -18,19 +19,23 @@ const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 
 const angleSuggestions = (query, callback) => {
-  callback([
-    { value: "0" },
-    { value: "π" },
-    { value: "π/2" },
-    { value: "-π/2" },
-    { value: "π/4" },
-    { value: "-π/4" },
-    { value: "3π/4" },
-    { value: "-3π/4" },
-    { value: "α" },
-    { value: "β" },
-    { value: "γ" },
-  ]);
+  callback(angles.DEFAULT_SUGGESTIONS);
+};
+// Change event isn't fired for ElAutocomplete
+const changeSetAngle = () => {
+  panelStore.angleToSet = angles.cleanInputStr(panelStore.angleToSet);
+};
+const clickSetAngle = () => {
+  panelStore.angleToSet = angles.cleanInputStr(panelStore.angleToSet);
+  emit("command", "a");
+};
+// Change event isn't fired for ElAutocomplete
+const changeAddAngle = () => {
+  panelStore.angleToAdd = angles.cleanInputStr(panelStore.angleToAdd);
+};
+const clickAddAngle = () => {
+  panelStore.angleToAdd = angles.cleanInputStr(panelStore.angleToAdd);
+  emit("command", "A");
 };
 
 const props = defineProps({
@@ -97,6 +102,25 @@ const emit = defineEmits(["command"]);
           >
             Clear Graph
           </ElButton>
+          No selection:
+          <ElTooltip content="Create a boundary node [B]">
+            <ElButton
+              class="btn"
+              @click="emit('command', 'b')"
+              :disabled="!props.checkCanDoCommand.b.value"
+            >
+              New Boundary
+            </ElButton>
+          </ElTooltip>
+          <ElTooltip content="Create a Z node [N]">
+            <ElButton
+              class="btn"
+              @click="emit('command', 'n')"
+              :disabled="!props.checkCanDoCommand.n.value"
+            >
+              New Node
+            </ElButton>
+          </ElTooltip>
           Select nodes:
           <ElTooltip content="Toggle edges on selected nodes [E]">
             <ElButton
@@ -122,6 +146,7 @@ const emit = defineEmits(["command"]);
             :fetch-suggestions="angleSuggestions"
             :trigger-on-focus="true"
             clearable
+            hide-loading
             class="inline-input"
           >
             <template #append>
@@ -130,32 +155,36 @@ const emit = defineEmits(["command"]);
               >
                 <ElButton
                   class="btn"
-                  @click="emit('command', 'a')"
+                  @click="clickSetAngle"
+                  @change="changeSetAngle"
                   :disabled="!props.checkCanDoCommand.a.value"
                   :icon="EditPen"
                 />
               </ElTooltip>
             </template>
           </ElAutocomplete>
-          No selection:
-          <ElTooltip content="Create a boundary node [B]">
-            <ElButton
-              class="btn"
-              @click="emit('command', 'b')"
-              :disabled="!props.checkCanDoCommand.b.value"
-            >
-              New Boundary
-            </ElButton>
-          </ElTooltip>
-          <ElTooltip content="Create a Z node [N]">
-            <ElButton
-              class="btn"
-              @click="emit('command', 'n')"
-              :disabled="!props.checkCanDoCommand.n.value"
-            >
-              New Node
-            </ElButton>
-          </ElTooltip>
+          <ElAutocomplete
+            v-model="panelStore.angleToAdd"
+            placeholder="Add Angle"
+            :fetch-suggestions="angleSuggestions"
+            :trigger-on-focus="true"
+            clearable
+            class="inline-input"
+          >
+            <template #append>
+              <ElTooltip
+                content="Add to the current angle of selected non-boundary nodes [Shift+A]"
+              >
+                <ElButton
+                  class="btn"
+                  @click="clickAddAngle"
+                  @change="changeAddAngle"
+                  :disabled="!props.checkCanDoCommand.A.value"
+                  :icon="Plus"
+                />
+              </ElTooltip>
+            </template>
+          </ElAutocomplete>
           Any selection:
           <ElTooltip content="Delete selected nodes or edges [X]">
             <ElButton
@@ -311,7 +340,9 @@ const emit = defineEmits(["command"]);
             inactive-text=""
             active-text="Scale nodes"
           />
-          <ElButton class="btn" @click="emit('command', 'resetView')">Reset View</ElButton>
+          <ElButton class="btn" @click="emit('command', 'resetView')">
+            Reset View
+          </ElButton>
         </div>
       </div>
     </Transition>
@@ -334,8 +365,10 @@ const emit = defineEmits(["command"]);
 /* Panel grid and placement */
 .grid-container {
   display: grid;
+  /* prettier-ignore */
   grid-template-columns: [left] var(--left-width) [leftmid] 1fr [rightmid] var(
       --right-width) [right];
+  /* prettier-ignore */
   grid-template-rows: [top] var(--top-height) [topmid] 1fr [bottommid] var(
       --bottom-height) [bottom];
   gap: 10px;
