@@ -60,11 +60,11 @@ export const _isEdgesValidPathHelper = (edgeIds, ignoreCurrent) => {
 
   if (!ignoreCurrent) {
     let overlap = false;
-    forPathsOfEdges(edgeIds, () => {
+    forPathsConflictingWithEdges(edgeIds, () => {
       overlap = true;
     });
     if (overlap) {
-      return "path overlaps with current";
+      return "path overlaps with current edge or node of another path";
     }
   }
 
@@ -197,12 +197,33 @@ export const forInnerEdgesOfNodes = (nodeIds, callback) => {
 };
 
 // Calls callback for every path that uses at least one edge
+// But this does not include all paths conflicted with these edges
 export const forPathsOfEdges = (edgeIds, callback) => {
   const paths = graphStore.paths;
   for (const pathId of Object.keys(paths)) {
     const pathEdgeSet = new Set(paths[pathId].edges);
     inner: for (const edgeId of edgeIds) {
       if (pathEdgeSet.has(edgeId)) {
+        callback(pathId);
+        break inner;
+      }
+    }
+  }
+};
+
+// Calls callback for every path that uses at least one edge or shared node
+export const forPathsConflictingWithEdges = (edgeIds, callback) => {
+  const paths = graphStore.paths;
+  for (const pathId of Object.keys(paths)) {
+    const pathNodeSet = new Set();
+    for (const edgeId of paths[pathId].edges) {
+      const [n1, n2] = nodesOfEdge(edgeId);
+      pathNodeSet.add(n1);
+      pathNodeSet.add(n2);
+    }
+    inner: for (const edgeId of edgeIds) {
+      const [n1, n2] = nodesOfEdge(edgeId);
+      if (pathNodeSet.has(n1) || pathNodeSet.has(n2)) {
         callback(pathId);
         break inner;
       }
@@ -395,7 +416,7 @@ export const setAngle = (nodes, angle) => {
   }
 };
 
-// Remove all paths dependent on these edges
+// Remove all paths dependent on these edges or shared nodes
 export const clearPathsByEdges = (edges) => {
   forPathsOfEdges(edges, (pathId) => {
     delete graphStore.paths[pathId];
