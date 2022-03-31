@@ -145,6 +145,9 @@ const recordAfterGraphMod = (name) => {
 
 // Execute graph commands
 const command = (code) => {
+  if (!checkCanDoCommand[code]?.value) {
+    return;
+  }
   console.log(`Command: ${code}`);
   let used = true;
   if (!panelStore.rewriteMode) {
