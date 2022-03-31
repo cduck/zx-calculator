@@ -274,6 +274,11 @@ const checkCanDoCommand = {
     () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
   ),
   a: computed(() => {
+    try {
+      angles.cleanInputStr(panelStore.angleToSet || "0");
+    } catch (e) {
+      return false;
+    }
     for (const node of selectedNodes.value) {
       if (!gops.isBoundaryNode(node)) return true;
     }
@@ -281,6 +286,11 @@ const checkCanDoCommand = {
   }),
   A: computed(() => {
     if (!panelStore.angleToAdd) {
+      return false;
+    }
+    try {
+      angles.cleanInputStr(panelStore.angleToAdd);
+    } catch (e) {
       return false;
     }
     for (const node of selectedNodes.value) {
@@ -415,7 +425,12 @@ const clearGraph = () => {
 };
 
 const setNodeAngles = () => {
-  const angle = angles.cleanInputStr(panelStore.angleToSet);
+  let angle;
+  try {
+    angle = angles.cleanInputStr(panelStore.angleToSet);
+  } catch (e) {
+    return;
+  }
   for (const n of selectedNodes.value) {
     if (!gops.isBoundaryNode(n)) {
       gops.setAngle(n, angle);
@@ -424,7 +439,12 @@ const setNodeAngles = () => {
 };
 
 const addNodeAngles = () => {
-  const angle = angles.cleanInputStr(panelStore.angleToAdd);
+  let angle;
+  try {
+    angle = angles.cleanInputStr(panelStore.angleToAdd);
+  } catch (e) {
+    return;
+  }
   if (!angle) {
     return;
   }

@@ -1,7 +1,13 @@
-import { evaluate, simplify, parse, OperatorNode, ConstantNode } from "mathjs";
+import { simplify, parse, OperatorNode, ConstantNode } from "mathjs";
 import * as math from "mathjs";
+document.math=math;
 
-const BEST_PI = "π";
+export const ANGLE_ZERO = "0";
+export const ANGLE_PI = "π";
+export const ANGLE_PI_DIV2 = "π/2";
+export const ANGLE_PI_DIVN2 = "-π/2";
+
+const STR_OPS = {notation: "fixed"};
 
 // List of LaTeX symbol variable names from
 // https://gist.github.com/Metaxal/86be1b733c0f5ad4a0cf6c58cf140436
@@ -108,7 +114,7 @@ const prettyStrToParsable = (str) => {
 };
 
 const simplifyAndWrapExpr = (str) => {
-  const strDivPi = `(${str})/pi`;
+  const strDivPi = `(${str.toString(STR_OPS)})/pi`;
   let simp = simplify(strDivPi, { context: simplify.realContext });
   if (simp.op === "+" || simp.op === "-") {
     for (let i = 0; i < simp.args.length; i++) {
@@ -117,7 +123,9 @@ const simplifyAndWrapExpr = (str) => {
   } else {
     simp = wrapExprToPlusMinus1(simp);
   }
-  return simplify(`(${simp})*pi`, { context: simplify.realContext });
+  return simplify(`(${simp.toString(STR_OPS)})*pi`, {
+    context: simplify.realContext,
+  });
 };
 const wrapExprToPlusMinus1 = (expr) => {
   try {
@@ -134,7 +142,6 @@ const wrapExprToPlusMinus1 = (expr) => {
       false
     );
   } catch (e) {
-    console.log("ERR", e);
     return expr;
   }
 };
@@ -159,7 +166,7 @@ const reorderMultDiv = (expr) => {
 };
 
 const expressionToPretty = (expr) => {
-  let str = reorderMultDiv(simplifyAndWrapExpr(expr)).toString();
+  let str = reorderMultDiv(simplifyAndWrapExpr(expr)).toString(STR_OPS);
   str = str.trim();
   // All "operators": [ -/:-@[-`{-~]
   // All letters (including _): [^ -@[-^`{-~]
@@ -172,21 +179,21 @@ const expressionToPretty = (expr) => {
   str = str.replace(/(?<=[^ -/:-@[-`{-~]) +(?=[ -/:-@[-`{-~])/gu, "");
   // Remove * or space for implicit multiplication when number-letter or when
   // multiplying with parentheses
-  str = str.replace(/(?<=[0-9.)]) *\*? *(?=[^ -')-@[-^`{-~])/gu, ""); //`
+  str = str.replace(/(?<=[0-9.)]) *\*? *(?=[^ -')-@[-^`{-~])/gu, "");
   // Remove unneeded 1
-  str = str.replace(/(?<=-)1(?=[^ -@[-^`{-~])/gu, "");
+  str = str.replace(/(?<=-)1(?=[^ -@[-^`{-~])/gu, ""); // `
   // Replace with nice cdot symbol
   str = str.replaceAll("*", "·");
-  str = str.replace(/(?<=^|[ -@[-^`{-~])pi(?=[ -@[-^`{-~]|$)/gu, BEST_PI);
+  str = str.replace(/(?<=^|[ -@[-^`{-~])pi(?=[ -@[-^`{-~]|$)/gu, "π");
   return str;
 };
 
 const exprSum = (expr1, expr2) => {
-  return `(${expr1.toString()}) + (${expr2.toString()})`;
+  return `(${expr1.toString(STR_OPS)}) + (${expr2.toString(STR_OPS)})`;
 };
 
 const exprDiff = (expr1, expr2) => {
-  return `(${expr1.toString()}) - (${expr2.toString()})`;
+  return `(${expr1.toString(STR_OPS)}) - (${expr2.toString(STR_OPS)})`;
 };
 
 export const angleStrSum = (str1, str2) => {
@@ -202,12 +209,3 @@ export const angleStrDiff = (str1, str2) => {
   const sum = simplifyAndWrapExpr(exprDiff(expr1, expr2));
   return expressionToPretty(sum);
 };
-
-document.evaluate = evaluate;
-document.parse = parse;
-document.simplify = simplify;
-document.reorderMultDiv = reorderMultDiv;
-document.expressionToPretty = expressionToPretty;
-document.simplifyAndWrapExpr = simplifyAndWrapExpr;
-
-document.math = math;

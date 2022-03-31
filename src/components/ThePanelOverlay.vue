@@ -23,18 +23,34 @@ const angleSuggestions = (query, callback) => {
 };
 // Change event isn't fired for ElAutocomplete
 const changeSetAngle = () => {
-  panelStore.angleToSet = angles.cleanInputStr(panelStore.angleToSet);
+  try {
+    panelStore.angleToSet = angles.cleanInputStr(panelStore.angleToSet);
+  } catch (e) {
+    return;
+  }
 };
 const clickSetAngle = () => {
-  panelStore.angleToSet = angles.cleanInputStr(panelStore.angleToSet);
+  try {
+    panelStore.angleToSet = angles.cleanInputStr(panelStore.angleToSet);
+  } catch (e) {
+    return;
+  }
   emit("command", "a");
 };
 // Change event isn't fired for ElAutocomplete
 const changeAddAngle = () => {
-  panelStore.angleToAdd = angles.cleanInputStr(panelStore.angleToAdd);
+  try {
+    panelStore.angleToAdd = angles.cleanInputStr(panelStore.angleToAdd);
+  } catch (e) {
+    return;
+  }
 };
 const clickAddAngle = () => {
-  panelStore.angleToAdd = angles.cleanInputStr(panelStore.angleToAdd);
+  try {
+    panelStore.angleToAdd = angles.cleanInputStr(panelStore.angleToAdd);
+  } catch (e) {
+    return;
+  }
   emit("command", "A");
 };
 
