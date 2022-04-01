@@ -1,13 +1,11 @@
 import { simplify, parse, OperatorNode, ConstantNode } from "mathjs";
-import * as math from "mathjs";
-document.math=math;
 
 export const ANGLE_ZERO = "0";
 export const ANGLE_PI = "π";
 export const ANGLE_PI_DIV2 = "π/2";
 export const ANGLE_PI_DIVN2 = "-π/2";
 
-const STR_OPS = {notation: "fixed"};
+const STR_OPS = { notation: "fixed" };
 
 // List of LaTeX symbol variable names from
 // https://gist.github.com/Metaxal/86be1b733c0f5ad4a0cf6c58cf140436
@@ -99,7 +97,23 @@ export const DEFAULT_SUGGESTIONS = [
   { value: "-π/4" },
 ];
 
+export const isZero = (prettyStr) => {
+  return prettyStr === ANGLE_ZERO;
+};
+export const isPi = (prettyStr) => {
+  return prettyStr === ANGLE_PI;
+};
+export const isPiDiv2 = (prettyStr) => {
+  return prettyStr === ANGLE_PI_DIV2;
+};
+export const isPiDivN2 = (prettyStr) => {
+  return prettyStr === ANGLE_PI_DIVN2;
+};
+
 export const cleanInputStr = (str) => {
+  if (!str) {
+    str = "0";
+  }
   // Substitute backslash escapes
   str = str.replace(ESCAPE_RE, (m0, m1) => MATH_ALPHA[m1] || m0);
   // Normalize

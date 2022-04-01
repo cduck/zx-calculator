@@ -6,14 +6,14 @@ import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
 import { useUndoStore } from "@/stores/undoHistory.js";
 import { useGraphStore } from "@/stores/graph.js";
-import * as gops from "@/graphOps.js";
+import { GraphOps } from "@/graphOps.js";
 import * as angles from "@/angles.js";
 
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 const undoStore = useUndoStore();
 const graphStore = useGraphStore();
-gops.graphOpsSetup();
+const gops = new GraphOps(graphStore);
 
 const selectedNodes = ref([]);
 const selectedEdges = ref([]);
@@ -85,9 +85,30 @@ const graphStateFullReplace = (data) => {
   }, 0);
 };
 let wereNodesMoved = ref(false);
+const areSetsEqual = (set1, set2) => {
+  if (set1.size !== set2.size) return false;
+  for (const v of set1) {
+    if (!set2.has(v)) return false;
+  }
+  return true;
+};
+const wereNodesOrEdgesSelected = () => {
+  const peek = undoStore.peek(0);
+  if (peek) {
+    return (
+      !areSetsEqual(
+        new Set(selectedNodes.value),
+        new Set(peek.selectedNodes)
+      ) ||
+      !areSetsEqual(new Set(selectedEdges.value), new Set(peek.selectedEdges))
+    );
+  } else {
+    return selectedNodes.value.length > 0 || selectedEdges.value.length > 0;
+  }
+};
 const graphStateUndo = () => {
   // Save any changes to node positions without clearing redo history
-  if (wereNodesMoved.value) {
+  if (wereNodesMoved.value || wereNodesOrEdgesSelected()) {
     undoStore.insertEntry(makeFullGraphStateCopy(), "move nodes");
     wereNodesMoved.value = false;
   }
@@ -109,7 +130,7 @@ const graphStateUndo = () => {
 };
 const graphStateRedo = () => {
   // Save any changes to node positions without clearing redo history
-  if (wereNodesMoved.value) {
+  if (wereNodesMoved.value || wereNodesOrEdgesSelected()) {
     undoStore.insertEntry(makeFullGraphStateCopy(), "move nodes");
     wereNodesMoved.value = false;
   }
@@ -133,7 +154,7 @@ const nodeMove = () => {
   wereNodesMoved.value = true;
 };
 const recordBeforeGraphMod = () => {
-  if (wereNodesMoved.value) {
+  if (wereNodesMoved.value || wereNodesOrEdgesSelected()) {
     undoStore.addEntry(makeFullGraphStateCopy(), "move nodes");
     wereNodesMoved.value = false;
   }
@@ -145,9 +166,9 @@ const recordAfterGraphMod = (name) => {
 
 // Execute graph commands
 const command = (code) => {
-  if (!(checkCanDoCommand[code]?.value ?? true)) {
-    return;
-  }
+  const canDo = checkCanDoCommand[code]?.value;
+  if (canDo === undefined) return false;
+  if (!canDo) return true;
   console.log(`Command: ${code}`);
   let used = true;
   if (!panelStore.rewriteMode) {
@@ -323,7 +344,10 @@ const checkCanDoCommand = {
   }),
   c: computed(() => {
     for (const node of selectedNodes.value) {
-      if (!gops.isNodeNearBoundary(node) && gops.nodeIsPlusMinusPi2(node)) {
+      if (
+        !gops.isNodeNearBoundary(node) &&
+        gops.hasAnglePlusOrMinusPiDiv2(node)
+      ) {
         return true;
       }
     }
@@ -341,8 +365,14 @@ const checkCanDoCommand = {
   Escape: computed(
     () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
   ),
-  Undo: computed(() => !undoStore.isBottomOfHistory() || wereNodesMoved.value),
+  Undo: computed(
+    () =>
+      !undoStore.isBottomOfHistory() ||
+      wereNodesMoved.value ||
+      wereNodesOrEdgesSelected()
+  ),
   Redo: computed(() => !undoStore.isTopOfHistory()),
+  resetView: ref(true),
 };
 
 // Graph edit commands that adjust or use the selections before operating on the
