@@ -117,13 +117,15 @@ export class GraphRewrite {
     }
     // Perform graph modification
     if (!dryRun) {
-      //this.graphOps.substitutePathEdge();
-      this.graphOps.deleteNodes([n1, n2]);
+      let newEdge;
       if (hCount) {
-        return this.graphOps.addHadamardEdge(n3, n4);
+        newEdge = this.graphOps.addHadamardEdge(n3, n4);
       } else {
-        return this.graphOps.addNormalEdge(n3, n4);
+        newEdge = this.graphOps.addNormalEdge(n3, n4);
       }
+      this.graphOps.substitutePathEdge(edge, [newEdge], 1, 1);
+      this.graphOps.deleteNodes([n1, n2]);
+      return newEdge;
     }
   }
 
@@ -150,6 +152,7 @@ export class GraphRewrite {
       throw new GraphRewriteException("");
     }
     const neighbors = new Set();
+    const edgeMap = {};
     const types = new Set();
     this.graphOps.forEdgesOfNodes([node], (edgeId) => {
       if (!this.graphOps.isHadamardEdge(edgeId)) {
@@ -163,6 +166,7 @@ export class GraphRewrite {
         throw new GraphRewriteException("node has a multi-edge");
       }
       neighbors.add(n1);
+      edgeMap[n1] = edgeId;
       types.add(this.graphOps.nodeType(n1));
     });
     if (neighbors.has(node)) {
@@ -181,16 +185,62 @@ export class GraphRewrite {
     }
     const [n1, n2] = neighbors;
     if (!dryRun) {
+      // Merge n1 and n2 by moving edges from n2 to n1 and deleting n2
+      const oldTransfer = [];
+      const newTransfer = [];
       this.graphOps.forEdgesOfNodes([n2], (edgeId) => {
         let [n3, n4] = this.graphOps.nodesOfEdge(edgeId);
         if (n4 === n2) {
           [n3, n4] = [n4, n3];
         }
         if (n3 !== node) {
-          this.graphOps.addEdge(n1, n4, this.graphOps.edgeType(edgeId));
+          const newEdge = this.graphOps.addEdge(
+            n1,
+            n4,
+            this.graphOps.edgeType(edgeId)
+          );
+          oldTransfer.push(edgeId);
+          newTransfer.push(newEdge);
         }
       });
-      //this.graphOps.substitutePathEdge();
+      let handledPath = false;
+      this.graphOps.forPathsOfEdges(oldTransfer, (pathId) => {
+        if (handledPath) {
+          throw new GraphRewriteException("conflicting paths");
+        }
+        handledPath = true;
+        const pathEdges = this.graphOps.pathEdges(pathId);
+        const oldEdgeI = pathEdges.indexOf(edgeMap[n2]);
+        if (oldEdgeI >= 0) {
+          // Path goes through the given node
+          let i1 = oldTransfer.indexOf(pathEdges[oldEdgeI - 1]);
+          const i2 = oldTransfer.indexOf(pathEdges[oldEdgeI + 1]);
+          if (i1 < 0) i1 = i2;
+          if (i1 < 0) {
+            throw new GraphRewriteException("disconnected path (1)");
+          }
+          this.graphOps.substitutePathEdge(
+            edgeMap[n2],
+            [newTransfer[i1]],
+            1,
+            1
+          );
+        } else {
+          // Path only goes through n2
+          const i1 = oldTransfer.indexOf(pathEdges[oldEdgeI - 1]);
+          const i2 = oldTransfer.indexOf(pathEdges[oldEdgeI + 1]);
+          if (!(i1 >= 0 && i2 >= 0)) {
+            throw new GraphRewriteException("disconnected path (2)");
+          }
+          const [n3] = this.graphOps.nodesOfEdge(oldTransfer[i1]);
+          this.graphOps.substitutePathEdge(
+            oldTransfer[i1],
+            [newTransfer[i1], newTransfer[i2]],
+            n3 !== node,
+            n3 === node
+          );
+        }
+      });
       this.graphOps.addAngle(n1, this.graphOps.angle(n2));
       this.graphOps.deleteNodes([node, n2]);
     }

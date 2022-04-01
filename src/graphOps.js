@@ -227,6 +227,10 @@ export class GraphOps {
     }
   }
 
+  pathEdges(pathId) {
+    return this.graph.paths[pathId].edges;
+  }
+
   // Calls callback for every path that uses at least one edge
   // But this does not include all paths conflicted with these edges
   forPathsOfEdges(edgeIds, callback) {
@@ -515,34 +519,70 @@ export class GraphOps {
     return [newNodes, newEdges];
   }
 
-  substitutePathEdge(edgeId, newOrderedEdges) {
+  substitutePathEdge(edgeId, newOrderedEdges, extraBefore, extraAfter) {
+    extraBefore = extraBefore ?? 0;
+    extraAfter = extraAfter ?? 0;
     assert(newOrderedEdges.length > 0, "array argument must be non-empty");
     for (const pathId of Object.keys(this.graph.paths)) {
-      const pathEdges = this.graph.paths[pathId].edges;
-      const i = pathEdges.indexOf(edgeId);
+      const i = this.graph.paths[pathId].edges.indexOf(edgeId);
       if (i >= 0) {
+        const pathEdges = [...this.graph.paths[pathId].edges];
         // This path contains the edge
+        // Check if need to flip extraBefore and extraAfter
+        if (extraBefore > 0 || extraAfter > 0) {
+          if (i <= 0) {
+            const [n1] = this.nodesOfEdge(edgeId);
+            const [n3, n4] = this.nodesOfEdge(pathEdges[i + 1]);
+            if (n1 === n3 || n1 === n4) {
+              // Edge is reverse
+              [extraBefore, extraAfter] = [extraAfter, extraBefore];
+            }
+          } else {
+            const [n1, n2] = this.nodesOfEdge(pathEdges[i - 1]);
+            const [, n4] = this.nodesOfEdge(edgeId);
+            if (n1 === n4 || n2 === n4) {
+              // Edge is reverse
+              [extraBefore, extraAfter] = [extraAfter, extraBefore];
+            }
+          }
+        }
         // Check what order to insert newOrderedEdges
-        if (i == 0) {
+        if (i - extraBefore <= 0) {
           // Special case for the first edge
           // Check which end of the new edges the earlier edge matches with
-          const [n1, n2] = this.nodesOfEdge(pathEdges[i + 1]);
+          const [n1, n2] = this.nodesOfEdge(pathEdges[i - extraBefore + 1]);
           const [n3, n4] = this.nodesOfEdge(
             newOrderedEdges[newOrderedEdges.length - 1]
           );
           if (n1 === n3 || n1 === n4 || n2 === n3 || n2 === n4) {
-            pathEdges.splice(i, 1, ...newOrderedEdges);
+            pathEdges.splice(
+              i - extraBefore,
+              extraBefore + 1 + extraAfter,
+              ...newOrderedEdges
+            );
           } else {
-            pathEdges.splice(i, 1, ...[...newOrderedEdges].reverse());
+            pathEdges.splice(
+              i - extraBefore,
+              extraBefore + 1 + extraAfter,
+              ...[...newOrderedEdges].reverse()
+            );
           }
         } else {
           // Check which end of the new edges the earlier edge matches with
           const [n1, n2] = this.nodesOfEdge(pathEdges[i - 1]);
           const [n3, n4] = this.nodesOfEdge(newOrderedEdges[0]);
           if (n1 === n3 || n1 === n4 || n2 === n3 || n2 === n4) {
-            pathEdges.splice(i, 1, ...newOrderedEdges);
+            pathEdges.splice(
+              i - extraBefore,
+              extraBefore + 1 + extraAfter,
+              ...newOrderedEdges
+            );
           } else {
-            pathEdges.splice(i, 1, ...[...newOrderedEdges].reverse());
+            pathEdges.splice(
+              i - extraBefore,
+              extraBefore + 1 + extraAfter,
+              ...[...newOrderedEdges].reverse()
+            );
           }
         }
         // Set as new path
