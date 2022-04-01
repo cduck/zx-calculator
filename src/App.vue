@@ -376,11 +376,14 @@ const checkCanDoCommand = {
   }),
   clear: computed(() => Object.keys(graphStore.nodes).length >= 1),
   // Rewrite mode
-  h: computed(() => {
+  h1: computed(() => {
     for (const edge of selectedEdges.value) {
       if (grewrite.removeHEdgeWithDegree2NodesIsValid(edge)) return true;
     }
     return false;
+  }),
+  h2: computed(() => {
+    return true; // TODO
   }),
   H: computed(() => {
     for (const edge of selectedEdges.value) {

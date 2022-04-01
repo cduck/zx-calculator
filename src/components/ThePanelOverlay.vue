@@ -247,30 +247,41 @@ const emit = defineEmits(["command"]);
           </ElTooltip>
           Select single edge:
           <ElTooltip
-            content="Inserts two Hadamard edges by adding two Z nodes [Shift+H]"
+            content="Hadamard Cancellation: Removes a Hadamard edge between degree-2 nodes [H]"
+          >
+            <ElButton
+              class="btn"
+              @click="emit('command', 'h')"
+              :disabled="!props.checkCanDoCommand.h1.value"
+            >
+              Remove Edge+Nodes
+            </ElButton>
+          </ElTooltip>
+          <ElTooltip
+            content="Reverse Hadamard Cancellation: Inserts two Hadamard edges by adding two Z nodes [Shift+H]"
           >
             <ElButton
               class="btn"
               @click="emit('command', 'H')"
               :disabled="!props.checkCanDoCommand.H.value"
             >
-              Edge -&gt; 2 Nodes
+              Insert 2 Nodes
             </ElButton>
           </ElTooltip>
           Select single node:
           <ElTooltip
-            content="Removes a degree=2 node by merging its neighbors [H]"
+            content="Hadamard Cancellation: Removes a degree-2 node by merging its neighbors [H]"
           >
             <ElButton
               class="btn"
               @click="emit('command', 'h')"
-              :disabled="!props.checkCanDoCommand.h.value"
+              :disabled="!props.checkCanDoCommand.h2.value"
             >
               Remove degree-2
             </ElButton>
           </ElTooltip>
           <ElTooltip
-            content="Removes a ±π/2 node by toggling all edges between its neighbors and adding ∓π/2 [C]"
+            content="Local Complementation: Removes a ±π/2 node by toggling all edges between its neighbors and adding ∓π/2 [C]"
           >
             <ElButton
               class="btn"
@@ -282,7 +293,7 @@ const emit = defineEmits(["command"]);
           </ElTooltip>
           Select two nodes:
           <ElTooltip
-            content="Removes two nodes with angles 0 or π by toggling certain edges between their neighbors [P]"
+            content="Pivot: Removes two nodes with angles 0 or π by toggling certain edges between their neighbors [P]"
           >
             <ElButton
               class="btn"
@@ -294,7 +305,7 @@ const emit = defineEmits(["command"]);
           </ElTooltip>
           Select multiple nodes:
           <ElTooltip
-            content="Adds a ±π/2 node connected to the selected nodes by toggling all edges and adding ±π/2 [Shift+C]"
+            content="Reverse Complementation: Adds a ±π/2 node connected to the selected nodes by toggling all edges and adding ±π/2 [Shift+C]"
           >
             <ElButton
               class="btn"
@@ -311,7 +322,7 @@ const emit = defineEmits(["command"]);
             <ElRadioButton label="B">B</ElRadioButton>
           </ElRadioGroup>
           <ElTooltip
-            content="Adds two nodes by toggling edges between three groups of selections (A, A+B, and B) [Shift+P]"
+            content="Reverse Pivot: Adds two nodes by toggling edges between three groups of selections (A, A+B, and B) [Shift+P]"
           >
             <ElButton
               class="btn"
