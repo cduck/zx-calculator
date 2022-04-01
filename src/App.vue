@@ -145,7 +145,7 @@ const recordAfterGraphMod = (name) => {
 
 // Execute graph commands
 const command = (code) => {
-  if (!checkCanDoCommand[code]?.value) {
+  if (!(checkCanDoCommand[code]?.value ?? true)) {
     return;
   }
   console.log(`Command: ${code}`);
