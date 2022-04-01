@@ -236,15 +236,26 @@ const command = (code) => {
     switch (code) {
       case "h": {
         // Hadamard cancellation
-        const newEdges = [];
         recordBeforeGraphMod();
-        for (const e of selectedEdges.value) {
-          newEdges.push(grewrite.removeHEdgeWithDegree2Nodes(e));
+        if (selectedEdges.value.length > 0) {
+          const newEdges = [];
+          for (const e of selectedEdges.value) {
+            newEdges.push(grewrite.removeHEdgeWithDegree2Nodes(e));
+          }
+          selectedEdges.value = newEdges;
+          window.setTimeout(() => {
+            selectedEdges.value = newEdges; // Hack
+          }, 0);
+        } else {
+          const mergedNodes = [];
+          for (const n of selectedNodes.value) {
+            mergedNodes.push(grewrite.removeDegree2NodeWithHEdges(n));
+          }
+          selectedNodes.value = mergedNodes;
+          window.setTimeout(() => {
+            selectedNodes.value = mergedNodes; // Hack
+          }, 0);
         }
-        selectedEdges.value = newEdges;
-        window.setTimeout(() => {
-          selectedEdges.value = newEdges; // Hack
-        }, 0);
         recordAfterGraphMod("rewrite:hadamard cancellation");
         break;
       }
@@ -376,6 +387,7 @@ const checkCanDoCommand = {
   }),
   clear: computed(() => Object.keys(graphStore.nodes).length >= 1),
   // Rewrite mode
+  h: computed(() => checkCanDoCommand.h1.value || checkCanDoCommand.h2.value),
   h1: computed(() => {
     for (const edge of selectedEdges.value) {
       if (grewrite.removeHEdgeWithDegree2NodesIsValid(edge)) return true;
@@ -383,7 +395,10 @@ const checkCanDoCommand = {
     return false;
   }),
   h2: computed(() => {
-    return true; // TODO
+    for (const node of selectedNodes.value) {
+      if (grewrite.removeDegree2NodeWithHEdgesIsValid(node)) return true;
+    }
+    return false;
   }),
   H: computed(() => {
     for (const edge of selectedEdges.value) {

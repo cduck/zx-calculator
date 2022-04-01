@@ -270,14 +270,14 @@ const emit = defineEmits(["command"]);
           </ElTooltip>
           Select single node:
           <ElTooltip
-            content="Hadamard Cancellation: Removes a degree-2 node by merging its neighbors [H]"
+            content="Identity Removal: Removes a degree-2 node by merging its neighbors [H]"
           >
             <ElButton
               class="btn"
               @click="emit('command', 'h')"
               :disabled="!props.checkCanDoCommand.h2.value"
             >
-              Remove degree-2
+              Remove Degree-2
             </ElButton>
           </ElTooltip>
           <ElTooltip
