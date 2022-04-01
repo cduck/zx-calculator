@@ -8,7 +8,7 @@ export function GraphOperationException(msg) {
 export function AssertionError(msg) {
   this.message = msg;
 }
-const assert = (condition, msg) => {
+export const assert = (condition, msg) => {
   if (!condition) {
     throw new AssertionError(msg);
   }
@@ -34,11 +34,23 @@ export class GraphOps {
   isXNode(nodeId) {
     return this.graph.nodes[nodeId].zxType === "x";
   }
+  nodeType(nodeId) {
+    return this.graph.nodes[nodeId].zxType;
+  }
+  setNodeType(nodeId, zxType) {
+    this.graph.nodes[nodeId].zxType = zxType;
+  }
   isNormalEdge(edgeId) {
     return this.graph.edges[edgeId].zxType === "normal";
   }
   isHadamardEdge(edgeId) {
     return this.graph.edges[edgeId].zxType === "hadamard";
+  }
+  edgeType(edgeId) {
+    return this.graph.edges[edgeId].zxType;
+  }
+  setEdgeType(edgeId, zxType) {
+    this.graph.edges[edgeId].zxType = zxType;
   }
 
   isEdgesValidPath(edgeIds, ignoreCurrent) {
@@ -493,13 +505,14 @@ export class GraphOps {
       const auto = i === 0 && this.isBoundaryNode(n1) ? "normal" : "hadamard";
       const e = this.addEdge(prev, node, zxEdgeType || auto);
       newEdges.push(e);
+      prev = node;
     }
     const auto = this.isBoundaryNode(n2) ? "normal" : "hadamard";
     const e = this.addEdge(node, n2, zxEdgeType || auto);
     newEdges.push(e);
     this.substitutePathEdge(edge, newEdges);
-    this.deleteEdges([edge], zxEdgeType);
-    return newNodes;
+    this.deleteEdges([edge]);
+    return [newNodes, newEdges];
   }
 
   substitutePathEdge(edgeId, newOrderedEdges) {
@@ -520,7 +533,7 @@ export class GraphOps {
           if (n1 === n3 || n1 === n4 || n2 === n3 || n2 === n4) {
             pathEdges.splice(i, 1, ...newOrderedEdges);
           } else {
-            pathEdges.splice(i, 1, ...newOrderedEdges.reverse());
+            pathEdges.splice(i, 1, ...[...newOrderedEdges].reverse());
           }
         } else {
           // Check which end of the new edges the earlier edge matches with
@@ -529,7 +542,7 @@ export class GraphOps {
           if (n1 === n3 || n1 === n4 || n2 === n3 || n2 === n4) {
             pathEdges.splice(i, 1, ...newOrderedEdges);
           } else {
-            pathEdges.splice(i, 1, ...newOrderedEdges.reverse());
+            pathEdges.splice(i, 1, ...[...newOrderedEdges].reverse());
           }
         }
         // Set as new path

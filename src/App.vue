@@ -7,6 +7,7 @@ import { useStyleStore } from "@/stores/graphStyle.js";
 import { useUndoStore } from "@/stores/undoHistory.js";
 import { useGraphStore } from "@/stores/graph.js";
 import { GraphOps } from "@/graphOps.js";
+import { GraphRewrite } from "@/graphRewrite.js";
 import * as angles from "@/angles.js";
 
 const panelStore = usePanelStore();
@@ -14,6 +15,7 @@ const styleStore = useStyleStore();
 const undoStore = useUndoStore();
 const graphStore = useGraphStore();
 const gops = new GraphOps(graphStore);
+const grewrite = new GraphRewrite(gops);
 
 const selectedNodes = ref([]);
 const selectedEdges = ref([]);
@@ -232,11 +234,55 @@ const command = (code) => {
   } else {
     // Rewrite mode
     switch (code) {
-      case "`":
-        // For developer testing
+      case "h": {
+        // Hadamard cancellation
+        const newEdges = [];
         recordBeforeGraphMod();
-        addZNodes();
-        recordAfterGraphMod("rewrite:TEST");
+        for (const e of selectedEdges.value) {
+          newEdges.push(grewrite.removeHEdgeWithDegree2Nodes(e));
+        }
+        selectedEdges.value = newEdges;
+        window.setTimeout(() => {
+          selectedEdges.value = newEdges; // Hack
+        }, 0);
+        recordAfterGraphMod("rewrite:hadamard cancellation");
+        break;
+      }
+      case "H": {
+        // Reverse Hadamard cancellation
+        const middleEdges = [];
+        recordBeforeGraphMod();
+        for (const e of selectedEdges.value) {
+          middleEdges.push(grewrite.hEdgeToTwoNodes(e)[1][1]);
+        }
+        selectedEdges.value = middleEdges;
+        window.setTimeout(() => {
+          selectedEdges.value = middleEdges; // Hack
+        }, 0);
+        recordAfterGraphMod("rewrite:reverse hadamard cancellation");
+        break;
+      }
+      case "c": // Complementation
+        recordBeforeGraphMod();
+        for (const n of selectedNodes.value) {
+          //grewrite.(n);
+        }
+        recordAfterGraphMod("rewrite:complementation");
+        break;
+      case "C": // Reverse complementation
+        recordBeforeGraphMod();
+        //grewrite.(selectedNodes.value);
+        recordAfterGraphMod("rewrite:reverse complementation");
+        break;
+      case "p": // Pivot
+        recordBeforeGraphMod();
+        //grewrite.(selectedNodes.value);
+        recordAfterGraphMod("rewrite:pivot");
+        break;
+      case "P": // Reverse pivot
+        recordBeforeGraphMod();
+        //grewrite.(selectedNodes.value);
+        recordAfterGraphMod("rewrite:reverse pivot");
         break;
       default:
         used = false;
@@ -331,14 +377,14 @@ const checkCanDoCommand = {
   clear: computed(() => Object.keys(graphStore.nodes).length >= 1),
   // Rewrite mode
   h: computed(() => {
-    for (const node of selectedNodes.value) {
-      if (!gops.isNodeNearBoundary(node) && gops.degree(node) == 2) return true;
+    for (const edge of selectedEdges.value) {
+      if (grewrite.removeHEdgeWithDegree2NodesIsValid(edge)) return true;
     }
     return false;
   }),
   H: computed(() => {
-    for (const node of selectedNodes.value) {
-      if (!gops.isNodeNearBoundary(node)) return true;
+    for (const edge of selectedEdges.value) {
+      if (grewrite.hEdgeToTwoNodesIsValid(edge)) return true;
     }
     return false;
   }),
@@ -382,7 +428,7 @@ const addZNodes = () => {
     // For convenience, replace each edge with a new connected node
     const newNodes = [];
     for (const edge of selectedEdges.value) {
-      newNodes.push(...gops.insertNewNodesAlongEdge(edge, 1));
+      newNodes.push(...gops.insertNewNodesAlongEdge(edge, 1)[0]);
     }
     selectedEdges.value = [];
     selectedNodes.value = newNodes;
