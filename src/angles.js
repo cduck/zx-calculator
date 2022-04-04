@@ -1,4 +1,10 @@
-import { simplify, parse, OperatorNode, ConstantNode } from "mathjs";
+import {
+  simplify,
+  parse,
+  OperatorNode,
+  ConstantNode,
+  SymbolNode,
+} from "mathjs";
 
 export const ANGLE_ZERO = "0";
 export const ANGLE_PI = "π";
@@ -128,33 +134,53 @@ const prettyStrToParsable = (str) => {
 };
 
 const simplifyAndWrapExpr = (str) => {
-  const strDivPi = `(${str.toString(STR_OPS)})/pi`;
-  let simp = simplify(strDivPi, { context: simplify.realContext });
+  let simp = simplify(str, { context: simplify.realContext });
   if (simp.op === "+" || simp.op === "-") {
     for (let i = 0; i < simp.args.length; i++) {
-      simp.args[i] = wrapExprToPlusMinus1(simp.args[i]);
+      simp.args[i] = wrapExprToPlusMinusPi(simp.args[i]);
     }
   } else {
-    simp = wrapExprToPlusMinus1(simp);
+    simp = wrapExprToPlusMinusPi(simp);
   }
-  return simplify(`(${simp.toString(STR_OPS)})*pi`, {
+  return simplify(simp.toString(STR_OPS), {
     context: simplify.realContext,
   });
 };
-const wrapExprToPlusMinus1 = (expr) => {
+const divPiExpr = (expr) => {
+  return new OperatorNode(
+    "/",
+    "divide",
+    [expr, new SymbolNode("pi")],
+    false,
+    false
+  );
+};
+const mulPiExpr = (expr) => {
+  return new OperatorNode(
+    "*",
+    "multiply",
+    [expr, new SymbolNode("pi")],
+    false,
+    false
+  );
+};
+const wrapExprToPlusMinusPi = (expr) => {
   try {
-    const val = Math.ceil(expr.evaluate());
+    const val = Math.ceil(divPiExpr(expr).evaluate());
     if (val === 0 || val === 1) {
       return expr;
     }
     const correction = -Math.floor(val / 2) * 2;
-    return new OperatorNode(
-      "+",
-      "add",
-      [expr, new ConstantNode(correction)],
-      false,
-      false
-    );
+    if (isFinite(correction)) {
+      return new OperatorNode(
+        "+",
+        "add",
+        [expr, mulPiExpr(new ConstantNode(correction))],
+        false,
+        false
+      );
+    }
+    return expr;
   } catch (e) {
     return expr;
   }
