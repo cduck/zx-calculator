@@ -21,54 +21,6 @@ const styleStore = useStyleStore();
 const angleSuggestions = (query, callback) => {
   callback(angles.DEFAULT_SUGGESTIONS);
 };
-// Change event isn't fired for ElAutocomplete
-const changeSetAngle = () => {
-  try {
-    panelStore.angleToSet = angles.cleanInputStr(panelStore.angleToSet);
-  } catch (e) {
-    return;
-  }
-};
-const clickSetAngle = () => {
-  try {
-    panelStore.angleToSet = angles.cleanInputStr(panelStore.angleToSet);
-  } catch (e) {
-    return;
-  }
-  emit("command", "a");
-};
-// Change event isn't fired for ElAutocomplete
-const changeAddAngle = () => {
-  try {
-    panelStore.angleToAdd = angles.cleanInputStr(panelStore.angleToAdd);
-  } catch (e) {
-    return;
-  }
-};
-const clickAddAngle = () => {
-  try {
-    panelStore.angleToAdd = angles.cleanInputStr(panelStore.angleToAdd);
-  } catch (e) {
-    return;
-  }
-  emit("command", "A");
-};
-// Change event isn't fired for ElAutocomplete
-const changeSplitAngle = () => {
-  try {
-    panelStore.angleToSplit = angles.cleanInputStr(panelStore.angleToSplit);
-  } catch (e) {
-    return;
-  }
-};
-const clickSplitAngle = () => {
-  try {
-    panelStore.angleToSplit = angles.cleanInputStr(panelStore.angleToSplit);
-  } catch (e) {
-    return;
-  }
-  emit("command", "J");
-};
 
 const props = defineProps({
   checkCanDoCommand: Object,
@@ -187,8 +139,7 @@ const emit = defineEmits(["command"]);
               >
                 <ElButton
                   class="btn"
-                  @click="clickSetAngle"
-                  @change="changeSetAngle"
+                  @click="emit('command', 'a')"
                   :disabled="!props.checkCanDoCommand.a.value"
                   :icon="EditPen"
                 />
@@ -209,8 +160,7 @@ const emit = defineEmits(["command"]);
               >
                 <ElButton
                   class="btn"
-                  @click="clickAddAngle"
-                  @change="changeAddAngle"
+                  @click="emit('command', 'A')"
                   :disabled="!props.checkCanDoCommand.A.value"
                   :icon="Plus"
                 />
@@ -263,7 +213,7 @@ const emit = defineEmits(["command"]);
             <ElButton
               class="btn"
               @click="emit('command', 'h')"
-              :disabled="!props.checkCanDoCommand.h1.value"
+              :disabled="!props.checkCanDoCommand.h.value"
             >
               Remove Edge+Nodes
             </ElButton>
@@ -295,8 +245,7 @@ const emit = defineEmits(["command"]);
               >
                 <ElButton
                   class="btn"
-                  @click="clickSplitAngle"
-                  @change="changeSplitAngle"
+                  @click="emit('command', 'J')"
                   :disabled="!props.checkCanDoCommand.J.value"
                   :icon="Scissor"
                 />
@@ -305,12 +254,12 @@ const emit = defineEmits(["command"]);
           </ElAutocomplete>
           Select single node:
           <ElTooltip
-            content="Identity Removal: Removes a degree-2 node by merging its neighbors [H]"
+            content="Identity Removal: Removes a degree-2 node by merging its neighbors [J]"
           >
             <ElButton
               class="btn"
-              @click="emit('command', 'h')"
-              :disabled="!props.checkCanDoCommand.h2.value"
+              @click="emit('command', 'j')"
+              :disabled="!props.checkCanDoCommand.j.value"
             >
               Remove Degree-2
             </ElButton>

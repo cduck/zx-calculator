@@ -212,7 +212,7 @@ export class ConfigurableLayout {
 
   getOrCreateNodePosition(layouts, node) {
     if (!layouts[node]) {
-      layouts[node] = { x: 0, y: 0 };
+      layouts[node] = { x: 0, y: 0, zxAngle: "?" };
     }
     return toRef(layouts, node);
   }
@@ -301,7 +301,7 @@ export class ConfigurableLayout {
   forceLayoutEdges(edges) {
     // d3-force replaces the source/target in the edge with NodeDatum
     // objects, so build own link objects.
-    return Object.values(edges).map((v) => ({
+    return Object.values(edges).filter((v) => v.source).map((v) => ({
       source: v.source,
       target: v.target,
     }));

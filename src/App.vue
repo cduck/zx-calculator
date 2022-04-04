@@ -70,20 +70,24 @@ onMounted(() => {
 const makeFullGraphStateCopy = (recordMode) => {
   const data = graphStore.fullCopy();
   data.selectedNodes = [...selectedNodes.value];
-  data.selectedEdges = [...selectedEdges.value];
+  data.selectedEdges =
+    data.selectedNodes.length <= 0 ? [...selectedEdges.value] : [];
   if (recordMode) {
     data.rewriteMode = !!panelStore.rewriteMode;
   }
   return data;
 };
 const graphStateFullReplace = (data) => {
+  selectedNodes.value = [];
+  selectedEdges.value = [];
   graphStore.fullReplace(data);
   styleStore.view.layoutHandler.networkChanged();
-  selectedNodes.value = [...data.selectedNodes];
-  selectedEdges.value = [...data.selectedEdges];
+  selectedNodes.value = data.selectedNodes.filter((n) => graphStore.nodes[n]);
+  selectedEdges.value = data.selectedEdges.filter((e) => graphStore.edges[e]);
   window.setTimeout(() => {
-    selectedNodes.value = [...data.selectedNodes]; // Hack fix
-    selectedEdges.value = [...data.selectedEdges];
+    // Hack fix
+    selectedNodes.value = data.selectedNodes.filter((n) => graphStore.nodes[n]);
+    selectedEdges.value = data.selectedEdges.filter((e) => graphStore.edges[e]);
   }, 0);
 };
 let wereNodesMoved = ref(false);
@@ -237,25 +241,15 @@ const command = (code) => {
       case "h": {
         // Hadamard cancellation
         recordBeforeGraphMod();
-        if (selectedEdges.value.length > 0) {
-          const newEdges = [];
-          for (const e of selectedEdges.value) {
-            newEdges.push(...grewrite.removeHEdgeWithDegree2Nodes(e));
-          }
-          selectedEdges.value = newEdges;
-          window.setTimeout(() => {
-            selectedEdges.value = newEdges; // Hack
-          }, 0);
-        } else {
-          const mergedNodes = [];
-          for (const n of selectedNodes.value) {
-            mergedNodes.push(grewrite.removeDegree2NodeWithHEdges(n));
-          }
-          selectedNodes.value = mergedNodes;
-          window.setTimeout(() => {
-            selectedNodes.value = mergedNodes; // Hack
-          }, 0);
+        const newEdges = [];
+        for (const e of selectedEdges.value) {
+          newEdges.push(...grewrite.removeHEdgeWithDegree2Nodes(e));
         }
+        selectedEdges.value = newEdges;
+        selectedNodes.value = [];
+        window.setTimeout(() => {
+          selectedEdges.value = newEdges; // Hack
+        }, 0);
         recordAfterGraphMod("rewrite:hadamard cancellation");
         break;
       }
@@ -267,15 +261,57 @@ const command = (code) => {
           middleEdges.push(grewrite.hEdgeToTwoNodes(e)[1][1]);
         }
         selectedEdges.value = middleEdges;
+        selectedNodes.value = [];
         window.setTimeout(() => {
           selectedEdges.value = middleEdges; // Hack
         }, 0);
         recordAfterGraphMod("rewrite:reverse hadamard cancellation");
         break;
       }
+      case "j": {
+        // Hadamard cancellation / merge node
+        recordBeforeGraphMod();
+        const mergedNodes = [];
+        for (const n of selectedNodes.value) {
+          mergedNodes.push(grewrite.removeDegree2NodeWithHEdges(n));
+        }
+        selectedNodes.value = mergedNodes;
+        selectedEdges.value = [];
+        window.setTimeout(() => {
+          selectedNodes.value = mergedNodes; // Hack
+        }, 0);
+        recordAfterGraphMod("rewrite:hadamard cancellation");
+        break;
+      }
       case "J": {
         // Split node
-        // TODO
+        recordBeforeGraphMod();
+        try {
+          panelStore.angleToSplit = angles.cleanInputStr(
+            panelStore.angleToSplit
+          );
+        } catch {
+          panelStore.angleToSplit = "";
+        }
+        const newNodes = [];
+        if (selectedEdges.value.length > 0) {
+          newNodes.push(
+            grewrite.splitNode(
+              undefined,
+              selectedEdges.value,
+              panelStore.angleToSplit
+            )
+          );
+        } else {
+          for (const n of selectedNodes.value) {
+            newNodes.push(
+              grewrite.splitNode(n, undefined, panelStore.angleToSplit)
+            );
+          }
+        }
+        selectedNodes.value = newNodes;
+        selectedEdges.value = [];
+        recordAfterGraphMod("rewrite:split node");
         break;
       }
       case "c": // Complementation
@@ -392,16 +428,9 @@ const checkCanDoCommand = {
   }),
   clear: computed(() => Object.keys(graphStore.nodes).length >= 1),
   // Rewrite mode
-  h: computed(() => checkCanDoCommand.h1.value || checkCanDoCommand.h2.value),
-  h1: computed(() => {
+  h: computed(() => {
     for (const edge of selectedEdges.value) {
       if (grewrite.removeHEdgeWithDegree2NodesIsValid(edge)) return true;
-    }
-    return false;
-  }),
-  h2: computed(() => {
-    for (const node of selectedNodes.value) {
-      if (grewrite.removeDegree2NodeWithHEdgesIsValid(node)) return true;
     }
     return false;
   }),
@@ -411,9 +440,18 @@ const checkCanDoCommand = {
     }
     return false;
   }),
+  j: computed(() => {
+    for (const node of selectedNodes.value) {
+      if (grewrite.removeDegree2NodeWithHEdgesIsValid(node)) return true;
+    }
+    return false;
+  }),
   J: computed(() => {
-    if (selectedEdges.value.length < 2) return false;
-    return true; // TODO
+    if (grewrite.splitNodeIsValid(undefined, selectedEdges.value)) return true;
+    for (const n of selectedNodes.value) {
+      if (grewrite.splitNodeIsValid(n)) return true;
+    }
+    return false;
   }),
   c: computed(() => {
     for (const node of selectedNodes.value) {
@@ -528,32 +566,30 @@ const clearGraph = () => {
 };
 
 const setNodeAngles = () => {
-  let angle;
   try {
-    angle = angles.cleanInputStr(panelStore.angleToSet);
+    panelStore.angleToSet = angles.cleanInputStr(panelStore.angleToSet);
   } catch (e) {
     return;
   }
   for (const n of selectedNodes.value) {
     if (!gops.isBoundaryNode(n)) {
-      gops.setAngle(n, angle);
+      gops.setAngle(n, panelStore.angleToSet);
     }
   }
 };
 
 const addNodeAngles = () => {
-  let angle;
   try {
-    angle = angles.cleanInputStr(panelStore.angleToAdd);
+    panelStore.angleToAdd = angles.cleanInputStr(panelStore.angleToAdd);
   } catch (e) {
     return;
   }
-  if (!angle) {
+  if (!panelStore.angleToAdd) {
     return;
   }
   for (const n of selectedNodes.value) {
     if (!gops.isBoundaryNode(n)) {
-      gops.addAngle(n, angle);
+      gops.addAngle(n, panelStore.angleToAdd);
     }
   }
 };

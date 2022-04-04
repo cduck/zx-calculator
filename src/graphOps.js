@@ -1,5 +1,6 @@
 import {
   angleStrSum,
+  angleStrDiff,
   isZero,
   isPi,
   isPiDiv2,
@@ -33,32 +34,32 @@ export class GraphOps {
 
   ////////// Graph tests //////////
   isBoundaryNode(nodeId) {
-    return this.graph.nodes[nodeId].zxType === "boundary";
+    return this.graph.nodes[nodeId]?.zxType === "boundary";
   }
   isZNode(nodeId) {
-    return this.graph.nodes[nodeId].zxType === "z";
+    return this.graph.nodes[nodeId]?.zxType === "z";
   }
   isXNode(nodeId) {
-    return this.graph.nodes[nodeId].zxType === "x";
+    return this.graph.nodes[nodeId]?.zxType === "x";
   }
   isZOrXNode(nodeId) {
-    const t = this.graph.nodes[nodeId].zxType;
+    const t = this.graph.nodes[nodeId]?.zxType;
     return t === "z" || t === "x";
   }
   nodeType(nodeId) {
-    return this.graph.nodes[nodeId].zxType;
+    return this.graph.nodes[nodeId]?.zxType;
   }
   setNodeType(nodeId, zxType) {
     this.graph.nodes[nodeId].zxType = zxType;
   }
   isNormalEdge(edgeId) {
-    return this.graph.edges[edgeId].zxType === "normal";
+    return this.graph.edges[edgeId]?.zxType === "normal";
   }
   isHadamardEdge(edgeId) {
-    return this.graph.edges[edgeId].zxType === "hadamard";
+    return this.graph.edges[edgeId]?.zxType === "hadamard";
   }
   edgeType(edgeId) {
-    return this.graph.edges[edgeId].zxType;
+    return this.graph.edges[edgeId]?.zxType;
   }
   setEdgeType(edgeId, zxType) {
     this.graph.edges[edgeId].zxType = zxType;
@@ -86,6 +87,9 @@ export class GraphOps {
   _isEdgesValidPathHelper(edgeIds, ignoreCurrent) {
     if (edgeIds.length < 1) {
       return "empty path";
+    }
+    if (edgeIds.find((e) => !this.graph.edges[e])) {
+      return "nonexistant edge";
     }
 
     if (!ignoreCurrent) {
@@ -177,7 +181,6 @@ export class GraphOps {
     });
     return deg;
   }
-
   hDegree(nodeId) {
     let deg = 0;
     this.forEdgesOfNodes([nodeId], (edgeId) => {
@@ -202,6 +205,24 @@ export class GraphOps {
   hasAnglePlusOrMinusPiDiv2(nodeId) {
     const a = this.angle(nodeId);
     return isPiDiv2(a) || isPiDivN2(a);
+  }
+
+  locationXY(nodeId) {
+    return [this.locationX(nodeId), this.locationY(nodeId)];
+  }
+  locationX(nodeId) {
+    return this.graph.layouts.nodes[nodeId]?.x;
+  }
+  locationY(nodeId) {
+    return this.graph.layouts.nodes[nodeId]?.y;
+  }
+  setLocation(nodeId, x, y) {
+    if (this.graph.layouts.nodes[nodeId]) {
+      this.graph.layouts.nodes[nodeId].x = x;
+      this.graph.layouts.nodes[nodeId].y = y;
+    } else {
+      this.graph.layouts.nodes[nodeId] = { x: x, y: y };
+    }
   }
 
   isNodeNearBoundary(nodeId) {
@@ -342,7 +363,7 @@ export class GraphOps {
 
   ////////// Graph operations //////////
   addNode(zxType, x, y) {
-    assert(zxType, "required argument");
+    assert(zxType, "required first argument");
     let nodeId = `node${this.nextNodeIndex}`;
     while (this.graph.nodes[nodeId]) {
       this.nextNodeIndex *= 2;
@@ -368,7 +389,7 @@ export class GraphOps {
   }
 
   addEdge(n1, n2, zxType) {
-    assert(zxType, "required argument");
+    assert(zxType, "required third argument");
     let edgeId = `edge${this.nextEdgeIndex}`;
     while (this.graph.edges[edgeId]) {
       this.nextEdgeIndex *= 2;
@@ -512,6 +533,11 @@ export class GraphOps {
       a = angleStrSum(old, a);
     }
     this.setAngle(nodeId, a);
+  }
+
+  subtractAngle(nodeId, a) {
+    const old = this.angle(nodeId);
+    this.setAngle(nodeId, angleStrDiff(old, a));
   }
 
   // Remove all paths dependent on these edges or shared nodes
