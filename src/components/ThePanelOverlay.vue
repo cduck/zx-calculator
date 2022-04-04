@@ -7,7 +7,7 @@ import {
   ElRadioButton,
   ElAutocomplete,
 } from "element-plus";
-import { EditPen, Plus } from "@element-plus/icons-vue";
+import { EditPen, Plus, Scissor } from "@element-plus/icons-vue";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
 import { version, versionKind } from "@/version.js";
@@ -52,6 +52,22 @@ const clickAddAngle = () => {
     return;
   }
   emit("command", "A");
+};
+// Change event isn't fired for ElAutocomplete
+const changeSplitAngle = () => {
+  try {
+    panelStore.angleToSplit = angles.cleanInputStr(panelStore.angleToSplit);
+  } catch (e) {
+    return;
+  }
+};
+const clickSplitAngle = () => {
+  try {
+    panelStore.angleToSplit = angles.cleanInputStr(panelStore.angleToSplit);
+  } catch (e) {
+    return;
+  }
+  emit("command", "J");
 };
 
 const props = defineProps({
@@ -240,11 +256,6 @@ const emit = defineEmits(["command"]);
     <Transition name="panel-left">
       <div class="panely panel-left" v-show="show && panelStore.rewriteMode">
         <div>
-          <ElTooltip content="For developer testing [`]">
-            <ElButton class="btn" @click="emit('command', '`')">
-              [Dev]
-            </ElButton>
-          </ElTooltip>
           Select single edge:
           <ElTooltip
             content="Hadamard Cancellation: Removes a Hadamard edge between degree-2 nodes [H]"
@@ -268,6 +279,30 @@ const emit = defineEmits(["command"]);
               Insert 2 Nodes
             </ElButton>
           </ElTooltip>
+          Select edges on one node:
+          <ElAutocomplete
+            v-model="panelStore.angleToSplit"
+            placeholder="Split Node"
+            :fetch-suggestions="angleSuggestions"
+            :trigger-on-focus="true"
+            clearable
+            hide-loading
+            class="inline-input"
+          >
+            <template #append>
+              <ElTooltip
+                content="Splits a node into two nodes (connected by a degree-2 node) with the selected edges all on one side [Shift+J]"
+              >
+                <ElButton
+                  class="btn"
+                  @click="clickSplitAngle"
+                  @change="changeSplitAngle"
+                  :disabled="!props.checkCanDoCommand.J.value"
+                  :icon="Scissor"
+                />
+              </ElTooltip>
+            </template>
+          </ElAutocomplete>
           Select single node:
           <ElTooltip
             content="Identity Removal: Removes a degree-2 node by merging its neighbors [H]"

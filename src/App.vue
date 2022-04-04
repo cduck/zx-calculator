@@ -242,10 +242,12 @@ const command = (code) => {
           for (const e of selectedEdges.value) {
             newEdges.push(grewrite.removeHEdgeWithDegree2Nodes(e));
           }
-          selectedEdges.value = newEdges;
-          window.setTimeout(() => {
-            selectedEdges.value = newEdges; // Hack
-          }, 0);
+          // TODO
+          //selectedEdges.value = newEdges;
+          selectedEdges.value = [];
+          //window.setTimeout(() => {
+          //  selectedEdges.value = newEdges; // Hack
+          //}, 0);
         } else {
           const mergedNodes = [];
           for (const n of selectedNodes.value) {
@@ -271,6 +273,11 @@ const command = (code) => {
           selectedEdges.value = middleEdges; // Hack
         }, 0);
         recordAfterGraphMod("rewrite:reverse hadamard cancellation");
+        break;
+      }
+      case "J": {
+        // Split node
+        // TODO
         break;
       }
       case "c": // Complementation
@@ -349,7 +356,7 @@ const checkCanDoCommand = {
     return anyEdges;
   }),
   x: computed(
-    () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
+    () => selectedNodes.value.length > 0 || selectedEdges.value.length > 0
   ),
   a: computed(() => {
     try {
@@ -405,6 +412,10 @@ const checkCanDoCommand = {
       if (grewrite.hEdgeToTwoNodesIsValid(edge)) return true;
     }
     return false;
+  }),
+  J: computed(() => {
+    if (selectedEdges.value.length < 2) return false;
+    return true; // TODO
   }),
   c: computed(() => {
     for (const node of selectedNodes.value) {

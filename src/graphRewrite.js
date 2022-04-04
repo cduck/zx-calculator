@@ -1,8 +1,14 @@
-import { assert } from "@/graphOps.js";
-
 export function GraphRewriteException(msg) {
   this.message = msg;
 }
+export function AssertionError(msg) {
+  this.message = msg;
+}
+const assert = (condition, msg) => {
+  if (!condition) {
+    throw new AssertionError(msg);
+  }
+};
 
 export class GraphRewrite {
   constructor(graphOps) {
@@ -15,44 +21,56 @@ export class GraphRewrite {
   // If a normal edge with a boundary node, makes sure the new normal edge is
   // still connected to the boundary
   hEdgeToTwoNodesIsValid(edge, zxNodeType) {
-    return (zxNodeType ?? "z") === "z" || zxNodeType === "x";
+    try {
+      this.hEdgeToTwoNodes(edge, zxNodeType, true);
+    } catch (e) {
+      if (e instanceof GraphRewriteException) return false;
+      throw e;
+    }
+    return true;
   }
-  hEdgeToTwoNodes(edge, zxNodeType) {
+  hEdgeToTwoNodes(edge, zxNodeType, dryRun) {
+    zxNodeType = zxNodeType ?? "z";
     const oldType = this.graphOps.edgeType(edge);
     const [n1, n2] = this.graphOps.nodesOfEdge(edge);
-    zxNodeType = zxNodeType ?? "z";
-    if (zxNodeType !== "z" && zxNodeType !== "x") {
+    if (!(zxNodeType === "z" || zxNodeType === "x")) {
       throw new GraphRewriteException(
         `invalid node type "${zxNodeType}" not "x" or "z"`
       );
     }
-    const [newNodes, newEdges] = this.graphOps.insertNewNodesAlongEdge(
-      edge,
-      2,
-      "hadamard",
-      zxNodeType
-    );
-    if (oldType !== "hadamard") {
-      if (
-        this.graphOps.isBoundaryNode(n2) &&
-        !this.graphOps.isBoundaryNode(n1)
-      ) {
-        this.graphOps.setEdgeType(newEdges[newEdges.length - 1], oldType);
-      } else {
-        this.graphOps.setEdgeType(newEdges[0], oldType);
-      }
+    if (
+      oldType !== "hadamard" &&
+      !this.graphOps.isZOrXNode(n1) &&
+      !this.graphOps.isZOrXNode(n2)
+    ) {
+      throw new GraphRewriteException("too many boundary nodes!");
     }
-    return [newNodes, newEdges];
+    if (!dryRun) {
+      const [newNodes, newEdges] = this.graphOps.insertNewNodesAlongEdge(
+        edge,
+        2,
+        "hadamard",
+        zxNodeType
+      );
+      if (oldType !== "hadamard") {
+        if (
+          this.graphOps.isBoundaryNode(n2) &&
+          !this.graphOps.isBoundaryNode(n1)
+        ) {
+          this.graphOps.setEdgeType(newEdges[newEdges.length - 1], oldType);
+        } else {
+          this.graphOps.setEdgeType(newEdges[0], oldType);
+        }
+      }
+      return [newNodes, newEdges];
+    }
   }
 
   // Hadamard cancellation
   // The edge must be a Hadamard edge
-  // The edge's two nodes must be either X- or Z-type, have degree two, and zero
-  // angle
-  // The result is these two nodes and three edges gone, replaced with a new
-  // edge
-  // This edge is Hadamard if the three removed edges had an odd Hadamard count
-  // This edge is Normal otherwise
+  // The edge's two nodes must be either X- or Z-type, each have two Hadamard
+  // edges, and zero angle
+  // TODO: Some other constraints
   removeHEdgeWithDegree2NodesIsValid(edge) {
     try {
       this.removeHEdgeWithDegree2Nodes(edge, true);
@@ -63,69 +81,14 @@ export class GraphRewrite {
     return true;
   }
   removeHEdgeWithDegree2Nodes(edge, dryRun) {
-    if (!this.graphOps.isHadamardEdge(edge)) {
-      throw new GraphRewriteException("edge must be a Hadamard edge");
-    }
     const [n1, n2] = this.graphOps.nodesOfEdge(edge);
-    if (!(this.graphOps.hasAngleZero(n1) && this.graphOps.hasAngleZero(n2))) {
-      throw new GraphRewriteException(
-        `at least one node has nonzero angle ` +
-          `"${this.graphOps.angle(n1)}", "${this.graphOps.angle(n2)}"`
-      );
-    }
-    const nodeType = this.graphOps.nodeType(n1);
-    const nodeType2 = this.graphOps.nodeType(n2);
-    if (nodeType !== "z" && nodeType !== "x") {
-      throw new GraphRewriteException(
-        `node has invalid type ${nodeType} not "x" or "z"`
-      );
-    }
-    if (nodeType2 !== "z" && nodeType2 !== "x") {
-      throw new GraphRewriteException(
-        `node has invalid type ${nodeType2} not "x" or "z"`
-      );
-    }
-    const neighbors = {};
-    let hCount = true;
-    this.graphOps.forEdgesOfNodes([n1, n2], (e) => {
-      const [n3, n4] = this.graphOps.nodesOfEdge(e);
-      if (e !== edge) {
-        assert(!(n1 === n3 && n2 === n4), "edge is a multi-edge");
-        neighbors[n3] = (neighbors[n3] ?? 0) + 1;
-        neighbors[n4] = (neighbors[n4] ?? 0) + 1;
-        if (this.graphOps.isHadamardEdge(e)) {
-          hCount = !hCount;
-        } else if (!this.graphOps.isNormalEdge(e)) {
-          throw new GraphRewriteException(
-            `disallowed edge type "${this.graphOps.edgeType(e)}"`
-          );
-        }
-      }
-    });
-    if (!(neighbors[n1] && neighbors[n2])) {
-      throw new GraphRewriteException("both nodes are not degree 2");
-    }
-    delete neighbors[n1];
-    delete neighbors[n2];
-    const nList = Object.keys(neighbors);
-    if (nList.length != 2) {
-      throw new GraphRewriteException("both nodes are not degree 2");
-    }
-    const [n3, n4] = nList;
-    if (!(neighbors[n3] === 1 && neighbors[n4] === 1)) {
-      throw new GraphRewriteException("neighboring edge is a multi-edge");
-    }
-    // Perform graph modification
-    if (!dryRun) {
-      let newEdge;
-      if (hCount) {
-        newEdge = this.graphOps.addHadamardEdge(n3, n4);
-      } else {
-        newEdge = this.graphOps.addNormalEdge(n3, n4);
-      }
-      this.graphOps.substitutePathEdge(edge, [newEdge], 1, 1);
-      this.graphOps.deleteNodes([n1, n2]);
-      return newEdge;
+    try {
+      this.removeDegree2NodeWithHEdges(n1, undefined, dryRun);
+      // TODO: return new edge
+    } catch (e) {
+      if (!(e instanceof GraphRewriteException)) throw e;
+      this.removeDegree2NodeWithHEdges(n2, undefined, dryRun);
+      // TODO: return new edge
     }
   }
 
@@ -135,116 +98,151 @@ export class GraphRewrite {
   // The two neighbors must have equal types, X or Z, not necessarily the same
   // as the given node
   // The result is the two neighbor nodes merged into one with summed angles
-  removeDegree2NodeWithHEdgesIsValid(node) {
+  removeDegree2NodeWithHEdgesIsValid(node, preferredEdge) {
     try {
-      this.removeDegree2NodeWithHEdges(node, true);
+      this.removeDegree2NodeWithHEdges(node, preferredEdge, true);
     } catch (e) {
       if (e instanceof GraphRewriteException) return false;
       throw e;
     }
     return true;
   }
-  removeDegree2NodeWithHEdges(node, dryRun) {
-    if (!this.graphOps.hasAngleZero(node)) {
-      throw new GraphRewriteException("node has nonzero angle");
-    }
-    if (!(this.graphOps.isZNode(node) || this.graphOps.isXNode(node))) {
-      throw new GraphRewriteException("");
+  removeDegree2NodeWithHEdges(node, preferredEdge, dryRun) {
+    if (!(this.graphOps.isZOrXNode(node) && this.graphOps.hasAngleZero(node))) {
+      throw new GraphRewriteException(
+        "node is not Z or X or has a nonzero angle"
+      );
     }
     const neighbors = new Set();
-    const edgeMap = {};
-    const types = new Set();
-    this.graphOps.forEdgesOfNodes([node], (edgeId) => {
-      if (!this.graphOps.isHadamardEdge(edgeId)) {
-        throw new GraphRewriteException("node's edge is not a Hadamard edge");
+    const edges = new Set();
+    let nodeType;
+    this.graphOps.forEdgesOfNodes([node], (edge) => {
+      if (!this.graphOps.isHadamardEdge(edge)) {
+        throw new GraphRewriteException("node has a non-Hadamard edge");
       }
-      let [n1, n2] = this.graphOps.nodesOfEdge(edgeId);
+      const [maybe1, maybe2] = this.graphOps.nodesOfEdge(edge);
+      const n1 = maybe1 === node ? maybe2 : maybe1;
+      const n1Type = this.graphOps.nodeType(n1);
       if (n1 === node) {
-        n1 = n2;
+        throw new GraphRewriteException("node has a self-loop");
       }
       if (neighbors.has(n1)) {
         throw new GraphRewriteException("node has a multi-edge");
       }
+      if (edges.size >= 2) {
+        throw new GraphRewriteException("node has more than 2 edges");
+      }
+      if (!this.graphOps.isZOrXNode(n1)) {
+        throw new GraphRewriteException("node neighbor is not Z- or X-type");
+      }
+      if (nodeType && nodeType !== n1Type) {
+        throw new GraphRewriteException("node neighbor types do not match");
+      }
+      nodeType = n1Type;
       neighbors.add(n1);
-      edgeMap[n1] = edgeId;
-      types.add(this.graphOps.nodeType(n1));
+      edges.add(edge);
     });
-    if (neighbors.has(node)) {
-      throw new GraphRewriteException("node has a self-loop");
+    if (neighbors.size !== 2) {
+      throw new GraphRewriteException("node has fewer than 2 neighbors");
     }
-    if (neighbors.size != 2) {
-      throw new GraphRewriteException("node is not degree-2");
-    }
-    if (types.size !== 1) {
-      throw new GraphRewriteException("neighbors types do not match");
-    }
-    if (["z", "x"].indexOf([...types][0]) < 0) {
-      throw new GraphRewriteException(
-        `neighbors have invalid type "${[...types][0]}"`
-      );
-    }
-    const [n1, n2] = neighbors;
+    // Used to pick which new edge to return
+    //const [n1, n2] = this.graphOps.nodesOfEdge(preferredEdge);
+    //const preferredNode = n1 === node ? n2 : n1;
     if (!dryRun) {
-      // Merge n1 and n2 by moving edges from n2 to n1 and deleting n2
+      // Merge these nodes by deleting nOther and transferring its edges
+      const [nMerge, nOther] = neighbors;
       const oldTransfer = [];
       const newTransfer = [];
-      this.graphOps.forEdgesOfNodes([n2], (edgeId) => {
-        let [n3, n4] = this.graphOps.nodesOfEdge(edgeId);
-        if (n4 === n2) {
-          [n3, n4] = [n4, n3];
-        }
-        if (n3 !== node) {
-          const newEdge = this.graphOps.addEdge(
-            n1,
-            n4,
-            this.graphOps.edgeType(edgeId)
-          );
-          oldTransfer.push(edgeId);
+      let rmEdge;
+      // Add edges
+      this.graphOps.forEdgesOfNodesMutate([nOther], (edge) => {
+        const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+        if (n1 === node || n2 === node) {
+          rmEdge = edge;
+        } else {
+          const n = n1 === nOther ? n2 : n1;
+          const newEdge = this.graphOps.isHadamardEdge(edge)
+            ? this.graphOps.toggleHadamardEdgeHandleSelfLoop(
+                nMerge,
+                n,
+                this.graphOps.edgeType(edge)
+              ) ?? null
+            : this.graphOps.addEdge(nMerge, n, this.graphOps.edgeType(edge));
+          oldTransfer.push(edge);
           newTransfer.push(newEdge);
         }
       });
-      let handledPath = false;
+      // Adjust paths
       this.graphOps.forPathsOfEdges(oldTransfer, (pathId) => {
-        if (handledPath) {
-          throw new GraphRewriteException("conflicting paths");
-        }
-        handledPath = true;
         const pathEdges = this.graphOps.pathEdges(pathId);
-        const oldEdgeI = pathEdges.indexOf(edgeMap[n2]);
-        if (oldEdgeI >= 0) {
+        const transerIdx = [];
+        for (let i = 0; i < oldTransfer.length; i++) {
+          if (pathEdges.indexOf(oldTransfer[i]) >= 0) {
+            transerIdx.push(i);
+          }
+        }
+        if (transerIdx.length === 1) {
           // Path goes through the given node
-          let i1 = oldTransfer.indexOf(pathEdges[oldEdgeI - 1]);
-          const i2 = oldTransfer.indexOf(pathEdges[oldEdgeI + 1]);
-          if (i1 < 0) i1 = i2;
-          if (i1 < 0) {
-            throw new GraphRewriteException("disconnected path (1)");
+          if (pathEdges.indexOf(rmEdge) < 0) {
+            throw new GraphRewriteException("disconnected path nearby (1)");
           }
-          this.graphOps.substitutePathEdge(
-            edgeMap[n2],
-            [newTransfer[i1]],
-            1,
-            1
-          );
+          const pedge = oldTransfer[transerIdx[0]];
+          const nedge = newTransfer[transerIdx[0]];
+          const [n1] = this.graphOps.nodesOfEdge(pedge);
+          if (n1 === nOther) {
+            // Forward path
+            this.graphOps.substitutePathEdge(pedge, [nedge], 2, 0);
+          } else {
+            // Reverse path
+            this.graphOps.substitutePathEdge(pedge, [nedge], 0, 2);
+          }
+        } else if (transerIdx.length === 2) {
+          // Path only goes through the merged neighbor node
+          const pedge1 = oldTransfer[transerIdx[0]];
+          const pedge2 = oldTransfer[transerIdx[1]];
+          const nedge1 = newTransfer[transerIdx[0]];
+          const nedge2 = newTransfer[transerIdx[1]];
+          const e1SelfLoop =
+            !nedge1 && this.graphOps.nodesOfEdge(pedge1).indexOf(nMerge) >= 0;
+          const e2SelfLoop =
+            !nedge2 && this.graphOps.nodesOfEdge(pedge2).indexOf(nMerge) >= 0;
+          let inserted = [nedge1, nedge2];
+          if (e1SelfLoop) {
+            inserted = [nedge2];
+          } else if (e2SelfLoop) {
+            inserted = [nedge1];
+          } else if (!nedge1 || !nedge2) {
+            // Cannot adjust path because all connecting edges were deleted
+            console.warn("Failed to preserve path");
+            return; // Don't adjust path, let it be deleted
+          }
+          const [, n2] = this.graphOps.nodesOfEdge(pedge1);
+          if (n2 === nOther) {
+            // Forward path
+            this.graphOps.substitutePathEdge(pedge1, inserted, 0, 1);
+          } else {
+            // Reverse path
+            this.graphOps.substitutePathEdge(pedge1, inserted, 1, 0);
+          }
+        } else if (transerIdx.length > 2) {
+          // Too many matched edges
+          throw new GraphRewriteException("malformed path nearby");
         } else {
-          // Path only goes through n2
-          const i1 = oldTransfer.indexOf(pathEdges[oldEdgeI - 1]);
-          const i2 = oldTransfer.indexOf(pathEdges[oldEdgeI + 1]);
-          if (!(i1 >= 0 && i2 >= 0)) {
-            throw new GraphRewriteException("disconnected path (2)");
-          }
-          const [n3] = this.graphOps.nodesOfEdge(oldTransfer[i1]);
-          this.graphOps.substitutePathEdge(
-            oldTransfer[i1],
-            [newTransfer[i1], newTransfer[i2]],
-            n3 !== node,
-            n3 === node
-          );
+          assert(false, "forPathOfEdges matched without any matching edges");
         }
       });
-      this.graphOps.addAngle(n1, this.graphOps.angle(n2));
-      this.graphOps.deleteNodes([node, n2]);
+      // Move merged node to average of old positions
+      const nodePositions = this.graphOps.graph.layouts.nodes;
+      if (nodePositions[nMerge] && nodePositions[nOther]) {
+        nodePositions[nMerge].x +=
+          (nodePositions[nOther].x - nodePositions[nMerge].x) / 2;
+        nodePositions[nMerge].y +=
+          (nodePositions[nOther].y - nodePositions[nMerge].y) / 2;
+      }
+      // Delete nodes and edges
+      this.graphOps.deleteNodes([node, nOther]);
+      return nMerge;
     }
-    return n1;
   }
 
   // Local complementation

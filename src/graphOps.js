@@ -1,4 +1,11 @@
-import { angleStrSum, isZero, isPi, isPiDiv2, isPiDivN2 } from "@/angles.js";
+import {
+  angleStrSum,
+  isZero,
+  isPi,
+  isPiDiv2,
+  isPiDivN2,
+  ANGLE_PI,
+} from "@/angles.js";
 
 // Graph exceptions
 export function GraphOperationException(msg) {
@@ -33,6 +40,10 @@ export class GraphOps {
   }
   isXNode(nodeId) {
     return this.graph.nodes[nodeId].zxType === "x";
+  }
+  isZOrXNode(nodeId) {
+    const t = this.graph.nodes[nodeId].zxType;
+    return t === "z" || t === "x";
   }
   nodeType(nodeId) {
     return this.graph.nodes[nodeId].zxType;
@@ -167,6 +178,14 @@ export class GraphOps {
     return deg;
   }
 
+  hDegree(nodeId) {
+    let deg = 0;
+    this.forEdgesOfNodes([nodeId], (edgeId) => {
+      deg += this.isHadamardEdge(edgeId);
+    });
+    return deg;
+  }
+
   angle(nodeId) {
     return this.graph.nodes[nodeId].zxAngle ?? "0";
   }
@@ -211,6 +230,22 @@ export class GraphOps {
         callback(edgeId);
       }
     }
+  }
+
+  // Calls callback for every edge that uses at least one node
+  forEdgesOfNodesMutate(nodeIds, callback) {
+    const nodeIdSet = nodeIds instanceof Set ? nodeIds : new Set(nodeIds);
+    const edges = this.graph.edges;
+    const matches = [];
+    for (const edgeId of Object.keys(edges)) {
+      if (
+        nodeIdSet.has(edges[edgeId].source) ||
+        nodeIdSet.has(edges[edgeId].target)
+      ) {
+        matches.push(edgeId);
+      }
+    }
+    matches.forEach(callback);
   }
 
   // Calls callback for every edge that uses at least two nodes
@@ -356,6 +391,27 @@ export class GraphOps {
   addHadamardEdge(n1, n2) {
     return this.addEdge(n1, n2, "hadamard");
   }
+  toggleHadamardEdgeHandleSelfLoop(n1, n2, dontToggle) {
+    // Find existing Hadamard edges
+    const edges = [];
+    this.forInnerEdgesOfNodes([n1, n2], (edgeId) => {
+      if (this.isHadamardEdge(edgeId)) {
+        edges.push(edgeId);
+      }
+    });
+    this.deleteEdges(edges.slice((edges.length + !!dontToggle) % 2));
+    if (edges.length <= 0 && (edges.length + !!dontToggle) % 2 == 1) {
+      if (n1 === n2 && this.isZOrXNode(n1)) {
+        // Self loop is equal to an extra pi phase
+        this.addAngle(n1, ANGLE_PI);
+        return undefined;
+      } else {
+        return this.addHadamardEdge(n1, n2);
+      }
+    } else if ((edges.length + !!dontToggle) % 2 == 1) {
+      return edges[0];
+    }
+  }
 
   // If zxType is undefined, uses normal edges only to boundary nodes
   // If zxType, enforces this type for removed edges
@@ -477,10 +533,10 @@ export class GraphOps {
   }
 
   newPathId() {
-    let pathId = `edge${this.nextPathIndex}`;
+    let pathId = `path${this.nextPathIndex}`;
     while (this.graph.paths[pathId]) {
       this.nextPathIndex *= 2;
-      pathId = `edge${this.nextPathIndex}`;
+      pathId = `path${this.nextPathIndex}`;
     }
     this.nextPathIndex += 1;
     return pathId;
