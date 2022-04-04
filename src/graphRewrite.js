@@ -83,12 +83,10 @@ export class GraphRewrite {
   removeHEdgeWithDegree2Nodes(edge, dryRun) {
     const [n1, n2] = this.graphOps.nodesOfEdge(edge);
     try {
-      this.removeDegree2NodeWithHEdges(n1, undefined, dryRun);
-      // TODO: return new edge
+      return this.removeDegree2NodeWithHEdges(n1, edge, dryRun);
     } catch (e) {
       if (!(e instanceof GraphRewriteException)) throw e;
-      this.removeDegree2NodeWithHEdges(n2, undefined, dryRun);
-      // TODO: return new edge
+      return this.removeDegree2NodeWithHEdges(n2, edge, dryRun);
     }
   }
 
@@ -98,16 +96,16 @@ export class GraphRewrite {
   // The two neighbors must have equal types, X or Z, not necessarily the same
   // as the given node
   // The result is the two neighbor nodes merged into one with summed angles
-  removeDegree2NodeWithHEdgesIsValid(node, preferredEdge) {
+  removeDegree2NodeWithHEdgesIsValid(node, startingEdge) {
     try {
-      this.removeDegree2NodeWithHEdges(node, preferredEdge, true);
+      this.removeDegree2NodeWithHEdges(node, startingEdge, true);
     } catch (e) {
       if (e instanceof GraphRewriteException) return false;
       throw e;
     }
     return true;
   }
-  removeDegree2NodeWithHEdges(node, preferredEdge, dryRun) {
+  removeDegree2NodeWithHEdges(node, startingEdge, dryRun) {
     if (!(this.graphOps.isZOrXNode(node) && this.graphOps.hasAngleZero(node))) {
       throw new GraphRewriteException(
         "node is not Z or X or has a nonzero angle"
@@ -145,12 +143,17 @@ export class GraphRewrite {
     if (neighbors.size !== 2) {
       throw new GraphRewriteException("node has fewer than 2 neighbors");
     }
-    // Used to pick which new edge to return
-    //const [n1, n2] = this.graphOps.nodesOfEdge(preferredEdge);
-    //const preferredNode = n1 === node ? n2 : n1;
     if (!dryRun) {
       // Merge these nodes by deleting nOther and transferring its edges
-      const [nMerge, nOther] = neighbors;
+      let [nMerge, nOther] = neighbors;
+      if (startingEdge) {
+        // Used to control which new edge to return
+        const [t1, t2] = this.graphOps.nodesOfEdge(startingEdge);
+        const preferredNode = t1 === node ? t2 : t1;
+        if (preferredNode !== nOther) {
+          [nMerge, nOther] = [nOther, nMerge];
+        }
+      }
       const oldTransfer = [];
       const newTransfer = [];
       let rmEdge;
@@ -232,16 +235,25 @@ export class GraphRewrite {
         }
       });
       // Move merged node to average of old positions
-      const nodePositions = this.graphOps.graph.layouts.nodes;
-      if (nodePositions[nMerge] && nodePositions[nOther]) {
-        nodePositions[nMerge].x +=
-          (nodePositions[nOther].x - nodePositions[nMerge].x) / 2;
-        nodePositions[nMerge].y +=
-          (nodePositions[nOther].y - nodePositions[nMerge].y) / 2;
+      if (!startingEdge) {
+        const nodePositions = this.graphOps.graph.layouts.nodes;
+        if (nodePositions[nMerge] && nodePositions[nOther]) {
+          nodePositions[nMerge].x +=
+            (nodePositions[nOther].x - nodePositions[nMerge].x) / 2;
+          nodePositions[nMerge].y +=
+            (nodePositions[nOther].y - nodePositions[nMerge].y) / 2;
+        }
       }
+      // Sum angles
+      this.graphOps.addAngle(nMerge, this.graphOps.angle(nOther));
       // Delete nodes and edges
       this.graphOps.deleteNodes([node, nOther]);
-      return nMerge;
+      // Return a useful output
+      if (startingEdge) {
+        return newTransfer.filter((e) => e !== null);
+      } else {
+        return nMerge;
+      }
     }
   }
 

@@ -240,14 +240,12 @@ const command = (code) => {
         if (selectedEdges.value.length > 0) {
           const newEdges = [];
           for (const e of selectedEdges.value) {
-            newEdges.push(grewrite.removeHEdgeWithDegree2Nodes(e));
+            newEdges.push(...grewrite.removeHEdgeWithDegree2Nodes(e));
           }
-          // TODO
-          //selectedEdges.value = newEdges;
-          selectedEdges.value = [];
-          //window.setTimeout(() => {
-          //  selectedEdges.value = newEdges; // Hack
-          //}, 0);
+          selectedEdges.value = newEdges;
+          window.setTimeout(() => {
+            selectedEdges.value = newEdges; // Hack
+          }, 0);
         } else {
           const mergedNodes = [];
           for (const n of selectedNodes.value) {
