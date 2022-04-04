@@ -99,6 +99,8 @@ const areSetsEqual = (set1, set2) => {
   return true;
 };
 const wereNodesOrEdgesSelected = () => {
+  return false;
+  // TODO
   const peek = undoStore.peek(0);
   if (peek) {
     return (
@@ -316,8 +318,11 @@ const command = (code) => {
       }
       case "c": // Complementation
         recordBeforeGraphMod();
-        for (const n of selectedNodes.value) {
-          //grewrite.(n);
+        if (selectedNodes.value.length === 1) {
+          console.log(selectedNodes.value);
+          const nodes = grewrite.localComplementation(selectedNodes.value[0]);
+          selectedNodes.value = nodes;
+          selectedEdges.value = [];
         }
         recordAfterGraphMod("rewrite:complementation");
         break;
@@ -454,15 +459,8 @@ const checkCanDoCommand = {
     return false;
   }),
   c: computed(() => {
-    for (const node of selectedNodes.value) {
-      if (
-        !gops.isNodeNearBoundary(node) &&
-        gops.hasAnglePlusOrMinusPiDiv2(node)
-      ) {
-        return true;
-      }
-    }
-    return false;
+    if (selectedNodes.value.length !== 1) return false;
+    return grewrite.localComplementationIsValid(selectedNodes.value[0]);
   }),
   C: computed(() => selectedNodes.value.length >= 1),
   p: computed(

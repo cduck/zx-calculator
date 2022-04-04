@@ -229,7 +229,7 @@ const emit = defineEmits(["command"]);
               Insert 2 Nodes
             </ElButton>
           </ElTooltip>
-          Select edges on one node:
+          Select edges from node:
           <ElAutocomplete
             v-model="panelStore.angleToSplit"
             placeholder="Split Node"
@@ -275,6 +275,18 @@ const emit = defineEmits(["command"]);
               Complementation
             </ElButton>
           </ElTooltip>
+          Select multiple nodes:
+          <ElTooltip
+            content="Reverse Complementation: Adds a ±π/2 node connected to the selected nodes by toggling all edges and adding ±π/2 [Shift+C]"
+          >
+            <ElButton
+              class="btn"
+              @click="emit('command', 'C')"
+              :disabled="!props.checkCanDoCommand.C.value"
+            >
+              Rev. Complementation
+            </ElButton>
+          </ElTooltip>
           Select two nodes:
           <ElTooltip
             content="Pivot: Removes two nodes with angles 0 or π by toggling certain edges between their neighbors [P]"
@@ -287,33 +299,27 @@ const emit = defineEmits(["command"]);
               Pivot
             </ElButton>
           </ElTooltip>
-          Select multiple nodes:
+          Select A/B-group nodes:
           <ElTooltip
-            content="Reverse Complementation: Adds a ±π/2 node connected to the selected nodes by toggling all edges and adding ±π/2 [Shift+C]"
-          >
-            <ElButton
-              class="btn"
-              @click="emit('command', 'C')"
-              :disabled="!props.checkCanDoCommand.C.value"
-            >
-              Complementation
-            </ElButton>
-          </ElTooltip>
-          Reverse pivot:
-          <ElRadioGroup v-model="panelStore.selectMode">
-            <ElRadioButton label="a">A</ElRadioButton>
-            <ElRadioButton label="">Both</ElRadioButton>
-            <ElRadioButton label="B">B</ElRadioButton>
-          </ElRadioGroup>
-          <ElTooltip
-            content="Reverse Pivot: Adds two nodes by toggling edges between three groups of selections (A, A+B, and B) [Shift+P]"
+            content="Reverse Pivot: Adds two nodes by toggling edges between three groups (A, A+B, and B) [Shift+P]"
           >
             <ElButton
               class="btn"
               @click="emit('command', 'P')"
               :disabled="!props.checkCanDoCommand.P.value"
             >
-              Pivot
+              Reverse Pivot A
+            </ElButton>
+          </ElTooltip>
+          <ElTooltip
+            content="Reverse Pivot: Adds two nodes by toggling edges between three groups (A, A+B, and B) [Shift+P]"
+          >
+            <ElButton
+              class="btn"
+              @click="emit('command', 'P')"
+              :disabled="!props.checkCanDoCommand.P.value"
+            >
+              Reverse Pivot B
             </ElButton>
           </ElTooltip>
         </div>

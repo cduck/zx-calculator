@@ -226,13 +226,13 @@ export class GraphOps {
   }
 
   isNodeNearBoundary(nodeId) {
-    if (this.isBoundaryNode(nodeId)) {
+    if (!this.isZOrXNode(nodeId)) {
       // Shortcut if this node is a boundary
       return true;
     }
     let near = false;
     this.forNodeCollectiveNeighborhood([nodeId], (n) => {
-      if (this.isBoundaryNode(n)) {
+      if (!this.isZOrXNode(n)) {
         near = true;
       }
     });

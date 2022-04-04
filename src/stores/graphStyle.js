@@ -15,6 +15,7 @@ const nodeConfig = {
       z: 10,
       x: 10,
       boundary: 5,
+      pivotA: 8,
       null: 7.5,
     }[n.zxType || null]),
   strokeWidth: (n) =>
@@ -22,6 +23,7 @@ const nodeConfig = {
       z: 1.5,
       x: 1.5,
       boundary: 1.5,
+      pivotA: 0,
       null: 0,
     }[n.zxType || null]),
   strokeColor: black,
@@ -31,6 +33,7 @@ const nodeConfig = {
       z: green,
       x: red,
       boundary: black,
+      pivotA: "pink",
       null: errorColor,
     }[n.zxType || null]),
 };

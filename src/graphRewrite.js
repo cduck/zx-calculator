@@ -68,9 +68,8 @@ export class GraphRewrite {
 
   // Hadamard cancellation
   // The edge must be a Hadamard edge
-  // The edge's two nodes must be either X- or Z-type, each have two Hadamard
-  // edges, and zero angle
-  // TODO: Some other constraints
+  // Either of the edge's two nodes must satisfy the constraints of
+  // removeDegree2NodeWithHEdges
   removeHEdgeWithDegree2NodesIsValid(edge) {
     try {
       this.removeHEdgeWithDegree2Nodes(edge, true);
@@ -231,7 +230,7 @@ export class GraphRewrite {
           // Too many matched edges
           throw new GraphRewriteException("malformed path nearby");
         } else {
-          assert(false, "forPathOfEdges matched without any matching edges");
+          assert(false, "forPathsOfEdges matched without any matching edges");
         }
       });
       // Move merged node to average of old positions
@@ -431,7 +430,7 @@ export class GraphRewrite {
         // Too many matched edges
         throw new GraphRewriteException("malformed path nearby");
       } else {
-        assert(false, "forPathOfEdges matched without any matching edges");
+        assert(false, "forPathsOfEdges matched without any matching edges");
       }
     });
     // Delete edges
@@ -441,5 +440,138 @@ export class GraphRewrite {
   }
 
   // Local complementation
-  // The node must have an angle
+  // The node must be Z- or X-type and have an angle of ±π/2
+  // The node's neighbors must all be Z- or X-type and may only have Hadamard
+  // edges between each other and the given node
+  localComplementationIsValid(node) {
+    try {
+      this.localComplementation(node, true);
+    } catch (e) {
+      if (e instanceof GraphRewriteException) return false;
+      throw e;
+    }
+    return true;
+  }
+  localComplementation(node, dryRun) {
+    if (
+      !(
+        this.graphOps.isZOrXNode(node) &&
+        this.graphOps.hasAnglePlusOrMinusPiDiv2(node)
+      )
+    ) {
+      throw new GraphRewriteException(
+        "node is not Z- or X-type or has a non ±π/2 angle"
+      );
+    }
+    const angle = this.graphOps.angle(node);
+    const neighbors = [];
+    const starEdges = [];
+    // Find neighbors
+    this.graphOps.forEdgesOfNodes([node], (edge) => {
+      const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+      const neighbor = n1 === node ? n2 : n1;
+      if (!this.graphOps.isHadamardEdge(edge)) {
+        throw new GraphRewriteException("edge is not a Hadamard edge");
+      }
+      if (!this.graphOps.isZOrXNode(neighbor)) {
+        throw new GraphRewriteException(
+          "node is neighbor to a non Z- or X-type node"
+        );
+      }
+      neighbors.push(neighbor);
+      starEdges.push(edge);
+    });
+    // Find existing edges to remove later
+    const edgesToRemove = [];
+    const oldNodePairs = new Set();
+    this.graphOps.forInnerEdgesOfNodes(neighbors, (edge) => {
+      const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+      if (!this.graphOps.isHadamardEdge(edge)) {
+        throw new GraphRewriteException(
+          "existing edge between neighbors is not a Hadamard edge"
+        );
+      }
+      edgesToRemove.push(edge);
+      const pair = this.graphOps.nodePairString(n1, n2);
+      if (oldNodePairs.has(pair)) {
+        throw new GraphRewriteException("multi-edge between neighbors");
+      }
+      oldNodePairs.add(pair);
+    });
+    if (dryRun) {
+      return;
+    }
+    // Add edges
+    const newEdgeMap = {};
+    for (let i = 0; i < neighbors.length; i++) {
+      const n1 = neighbors[i];
+      for (let j = i + 1; j < neighbors.length; j++) {
+        const n2 = neighbors[j];
+        const pair = this.graphOps.nodePairString(n1, n2);
+        if (!oldNodePairs.has(pair)) {
+          newEdgeMap[pair] = this.graphOps.addHadamardEdge(n1, n2);
+        }
+      }
+    }
+    // Update any paths
+    this.graphOps.forPathsOfEdges(starEdges, (pathId) => {
+      const pathEdges = this.graphOps.pathEdges(pathId);
+      const transferEdges = [];
+      for (const e of starEdges) {
+        if (pathEdges.indexOf(e) >= 0) {
+          transferEdges.push(e);
+        }
+      }
+      if (transferEdges.length === 2) {
+        // Path goes from one neighbor, to the given node, then out
+        const [e1, e2] = transferEdges;
+        const [n1a, n1b] = this.graphOps.nodesOfEdge(e1);
+        const n1 = n1a === node ? n1b : n1a;
+        const [n2a, n2b] = this.graphOps.nodesOfEdge(e2);
+        const n2 = n2a === node ? n2b : n2a;
+        const subsEdge = newEdgeMap[this.graphOps.nodePairString(n1, n2)];
+        if (!subsEdge) {
+          // The intended edge already existed and will be removed
+          // TODO: See if it is possible to maintain the path
+          return; // Give up on this path
+        }
+        if (n1b === node) {
+          // Forward path
+          this.graphOps.substitutePathEdge(e1, [subsEdge], 0, 1);
+        } else {
+          // Reverse path
+          this.graphOps.substitutePathEdge(e1, [subsEdge], 1, 0);
+        }
+      } else if (transferEdges.length > 0) {
+        // Too many matched edges
+        throw new GraphRewriteException("malformed path nearby");
+      } else {
+        assert(false, "forPathsOfEdges matched without any matching edges");
+      }
+    });
+    // Update angles
+    for (const n of neighbors) {
+      this.graphOps.subtractAngle(n, angle);
+    }
+    // Delete node and edges
+    this.graphOps.deleteEdges(edgesToRemove);
+    this.graphOps.deleteNodes([node]); // Also removes starEdges
+    return neighbors;
+  }
+
+  // Reverse local complementation
+  // The nodes must all be Z- or X-type and may only have Hadamard edges between
+  // each other
+  revLocalComplementationIsValid(nodes) {
+    try {
+      this.localComplementation(nodes, true);
+    } catch (e) {
+      if (e instanceof GraphRewriteException) return false;
+      throw e;
+    }
+    return true;
+  }
+  revLocalComplementation(nodes, dryRun) {
+
+  }
 }
