@@ -211,20 +211,25 @@ const expressionToPretty = (expr) => {
   // All "operators": [ -/:-@[-`{-~]
   // All letters (including _): [^ -@[-^`{-~]
   // All letters and numbers (including _): [^ -/:-@[-^`{-~]
+  const repMid = (m, m1, m2) => m1 + m2;
+  const rep2 = (str, re, rep) => {
+    str = str.replace(re, rep);
+    return str.replace(re, rep);
+  };
   // Remove spaces between operators
-  str = str.replace(/(?<=[ -/:-@[-`{-~]) +(?=[ -/:-@[-`{-~])/gu, "");
+  str = rep2(str, /([ -/:-@[-`{-~]) +([ -/:-@[-`{-~])/gu, repMid);
   // Remove spaces between operator-letter
-  str = str.replace(/(?<=[ -/:-@[-`{-~]) +(?=[^ -/:-@[-`{-~])/gu, "");
+  str = rep2(str, /([ -/:-@[-`{-~]) +([^ -/:-@[-`{-~])/gu, repMid);
   // Remove spaces between letter-operator
-  str = str.replace(/(?<=[^ -/:-@[-`{-~]) +(?=[ -/:-@[-`{-~])/gu, "");
+  str = rep2(str, /([^ -/:-@[-`{-~]) +([ -/:-@[-`{-~])/gu, repMid);
   // Remove * or space for implicit multiplication when number-letter or when
   // multiplying with parentheses
-  str = str.replace(/(?<=[0-9.)]) *\*? *(?=[^ -')-@[-^`{-~])/gu, "");
+  str = rep2(str, /([0-9.)]) *\*? *([^ -')-@[-^`{-~])/gu, repMid);
   // Remove unneeded 1
-  str = str.replace(/(?<=-)1(?=[^ -@[-^`{-~])/gu, ""); // `
+  str = str.replace(/(-)1([^ -@[-^`{-~])/gu, ""); // `
   // Replace with nice cdot symbol
   str = str.replaceAll("*", "·");
-  str = str.replace(/(?<=^|[ -@[-^`{-~])pi(?=[ -@[-^`{-~]|$)/gu, "π");
+  str = str.replace(/(^|[ -@[-^`{-~])pi([ -@[-^`{-~]|$)/gu, "π");
   return str;
 };
 
