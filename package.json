@@ -1,5 +1,5 @@
 {
-  "name": "vizx",
+  "name": "zx-calculator",
   "version": "0.0.0",
   "scripts": {
     "dev": "vite",
