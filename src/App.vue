@@ -1,19 +1,19 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeMount, onBeforeUnmount } from "vue";
+import { ref, computed, reactive, onMounted, onBeforeMount, onBeforeUnmount } from "vue";
 import TheGraphView from "@/components/TheGraphView.vue";
 import ThePanelOverlay from "@/components/ThePanelOverlay.vue";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
-import { useUndoStore } from "@/stores/undoHistory.js";
 import { useGraphStore } from "@/stores/graph.js";
+import { UndoHistory } from "@/undo.js";
 import { GraphOps } from "@/graphOps.js";
 import { GraphRewrite } from "@/graphRewrite.js";
 import * as angles from "@/angles.js";
 
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
-const undoStore = useUndoStore();
 const graphStore = useGraphStore();
+const undoStore = reactive(new UndoHistory());
 const gops = new GraphOps(graphStore);
 const grewrite = new GraphRewrite(gops);
 
@@ -99,8 +99,6 @@ const areSetsEqual = (set1, set2) => {
   return true;
 };
 const wereNodesOrEdgesSelected = () => {
-  return false;
-  // TODO
   const peek = undoStore.peek(0);
   if (peek) {
     return (
@@ -595,6 +593,7 @@ const addNodeAngles = () => {
 
 <template>
   <TheGraphView
+    :graph="graphStore"
     v-model:selectedNodes="selectedNodes"
     v-model:selectedEdges="selectedEdges"
     v-model:markedNodes="markedNodes"

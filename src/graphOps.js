@@ -50,7 +50,7 @@ export class GraphOps {
     return this.graph.nodes[nodeId]?.zxType;
   }
   setNodeType(nodeId, zxType) {
-    this.graph.nodes[nodeId].zxType = zxType;
+    this.graph.nodes[nodeId] = { ...this.graph.nodes[nodeId], zxType: zxType };
   }
   isNormalEdge(edgeId) {
     return this.graph.edges[edgeId]?.zxType === "normal";
@@ -62,7 +62,7 @@ export class GraphOps {
     return this.graph.edges[edgeId]?.zxType;
   }
   setEdgeType(edgeId, zxType) {
-    this.graph.edges[edgeId].zxType = zxType;
+    this.graph.edges[edgeId] = { ...this.graph.edges[edgeId], zxType: zxType };
   }
 
   isEdgesValidPath(edgeIds, ignoreCurrent) {
@@ -218,8 +218,11 @@ export class GraphOps {
   }
   setLocation(nodeId, x, y) {
     if (this.graph.layouts.nodes[nodeId]) {
-      this.graph.layouts.nodes[nodeId].x = x;
-      this.graph.layouts.nodes[nodeId].y = y;
+      this.graph.layouts.nodes[nodeId] = {
+        ...this.graph.layouts.nodes[nodeId],
+        x: x,
+        y: y,
+      };
     } else {
       this.graph.layouts.nodes[nodeId] = { x: x, y: y };
     }
@@ -523,6 +526,7 @@ export class GraphOps {
         zxAngle: angle,
       };
     } else {
+      this.graph.nodes[nodeId] = { ...this.graph.nodes[nodeId] };
       delete this.graph.nodes[nodeId].zxAngle;
     }
   }

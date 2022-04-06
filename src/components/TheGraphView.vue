@@ -3,13 +3,11 @@ import { ref, onMounted, onUnmounted } from "vue";
 import { ConfigurableLayout } from "@/graphConfigurableLayout.js";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
-import { useGraphStore } from "@/stores/graph.js";
 
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
-const graphStore = useGraphStore();
 
-const graph = ref(null);
+const graphElem = ref(null);
 
 // Catch pan start/stop events
 const mousedown = function (event) {
@@ -22,7 +20,7 @@ const mouseup = function (event) {
 // Watch and update grid snap settings
 onMounted(() => {
   styleStore.view.layoutHandler = new ConfigurableLayout(styleStore.layout);
-  styleStore.graph = graph.value;
+  styleStore.graph = graphElem.value;
 });
 onUnmounted(() => {
   delete styleStore.graph;
@@ -38,6 +36,7 @@ const eventHandlers = {
 
 // Register properties
 defineProps({
+  graph: Object,
   selectedNodes: Array,
   selectedEdges: Array,
   markedNodes: Object,
@@ -60,10 +59,10 @@ const emit = defineEmits([
     @mouseup="mouseup"
     @mouseout="mouseup"
     :class="{ 'main-graph': true, edit: !panelStore.rewriteMode }"
-    :nodes="graphStore.nodes"
-    :edges="graphStore.edges"
-    :paths="graphStore.paths"
-    :layouts="graphStore.layouts"
+    :nodes="graph.nodes"
+    :edges="graph.edges"
+    :paths="graph.paths"
+    :layouts="graph.layouts"
     :selected-nodes="selectedNodes"
     :selected-edges="selectedEdges"
     @update:selected-nodes="(v) => emit('update:selectedNodes', v)"
@@ -71,7 +70,7 @@ const emit = defineEmits([
     :configs="styleStore"
     v-model:zoom-level="styleStore.extra.zoomLevel"
     :event-handlers="eventHandlers"
-    ref="graph"
+    ref="graphElem"
   />
   <div class="test"></div>
 </template>
