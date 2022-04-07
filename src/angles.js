@@ -120,8 +120,12 @@ export const cleanInputStr = (str) => {
   if (!str) {
     str = "0";
   }
-  // Substitute backslash escapes
+  // Substitute Greek letter backslash escapes
   str = str.replace(ESCAPE_RE, (m0, m1) => MATH_ALPHA[m1] || m0);
+  // Reject disallowed characters
+  if (str.search(/[!"#$%',:;<=>?@[\\\]`{|}~]/) >= 0) {
+    throw { message: "angle has invalid characters" };
+  }
   // Normalize
   return expressionToPretty(parse(prettyStrToParsable(str)));
 };
@@ -224,12 +228,15 @@ const expressionToPretty = (expr) => {
   str = rep2(str, /([^ -/:-@[-`{-~]) +([ -/:-@[-`{-~])/gu, repMid);
   // Remove * or space for implicit multiplication when number-letter or when
   // multiplying with parentheses
-  str = rep2(str, /([0-9.)]) *\*? *([^ -')-@[-^`{-~])/gu, repMid);
+  str = str.replace(/([0-9.)]) *\*? *([^ -')-@[-^`{-~])/gu, repMid);
   // Remove unneeded 1
   str = str.replace(/(-)1([^ -@[-^`{-~])/gu, ""); // `
   // Replace with nice cdot symbol
   str = str.replaceAll("*", "·");
-  str = str.replace(/(^|[ -@[-^`{-~])pi([ -@[-^`{-~]|$)/gu, "π");
+  str = str.replace(
+    /(^|[ -@[-^`{-~])pi([ -@[-^`{-~]|$)/gu,
+    (m, m1, m2) => m1 + "π" + m2
+  );
   return str;
 };
 
