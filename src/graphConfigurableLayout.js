@@ -271,6 +271,7 @@ export class ConfigurableLayout {
   }
 
   networkChanged() {
+    if (!this.getParameters) return;
     const { edges } = this.getParameters();
     this.buildNodeLayouts();
     this.simulation.nodes(this.nodeLayouts);
@@ -301,10 +302,12 @@ export class ConfigurableLayout {
   forceLayoutEdges(edges) {
     // d3-force replaces the source/target in the edge with NodeDatum
     // objects, so build own link objects.
-    return Object.values(edges).filter((v) => v.source).map((v) => ({
-      source: v.source,
-      target: v.target,
-    }));
+    return Object.values(edges)
+      .filter((v) => v.source)
+      .map((v) => ({
+        source: v.source,
+        target: v.target,
+      }));
   }
 }
 

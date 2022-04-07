@@ -1,5 +1,12 @@
 <script setup>
-import { ref, computed, reactive, onMounted, onBeforeMount, onBeforeUnmount } from "vue";
+import {
+  ref,
+  computed,
+  reactive,
+  onMounted,
+  onBeforeMount,
+  onBeforeUnmount,
+} from "vue";
 import TheGraphView from "@/components/TheGraphView.vue";
 import ThePanelOverlay from "@/components/ThePanelOverlay.vue";
 import { usePanelStore } from "@/stores/panels.js";
@@ -13,7 +20,17 @@ import * as angles from "@/angles.js";
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 const graphStore = useGraphStore();
-const undoStore = reactive(new UndoHistory());
+const undoStore = reactive(
+  new UndoHistory({
+    maxHistory: 0,
+    linkToBrowser: true,
+    serialize: undefined,
+    deserialize: undefined,
+    title: (data, name, inHistory) =>
+      "ZX Calculator — " +
+      (inHistory ? `${graphSummary(data)}, ${name}` : graphSummary(data)),
+  })
+);
 const gops = new GraphOps(graphStore);
 const grewrite = new GraphRewrite(gops);
 
@@ -30,13 +47,23 @@ const panstop = () => {
   overlayInactive.value = false;
 };
 
-// Catch key strokes
+// Life cycle listeners
 onBeforeMount(() => {
   window.addEventListener("keydown", keydown);
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", keydown);
+  undoStore.unload();
 });
+onMounted(() => {
+  undoStore.load();
+  if (undoStore.isEmpty()) {
+    undoStore.addEntry(makeFullGraphStateCopy(), "init", true);
+  }
+  wereNodesMoved.value = false;
+});
+
+// Catch key strokes
 const keydown = (e) => {
   if (e.target instanceof HTMLInputElement) {
     return;
@@ -63,10 +90,11 @@ const keydown = (e) => {
 };
 
 // Undo/redo logic, accounting for nodes moved between edits
-onMounted(() => {
-  undoStore.addEntry(makeFullGraphStateCopy(), "init");
-  wereNodesMoved.value = false;
-});
+const graphSummary = (data) => {
+  const numNodes = Object.keys(data.nodes).length;
+  const numEdges = Object.keys(data.edges).length;
+  return `${numNodes} nodes, ${numEdges} edges`;
+};
 const makeFullGraphStateCopy = (recordMode) => {
   const data = graphStore.fullCopy();
   data.selectedNodes = [...selectedNodes.value];
@@ -111,6 +139,19 @@ const wereNodesOrEdgesSelected = () => {
   } else {
     return selectedNodes.value.length > 0 || selectedEdges.value.length > 0;
   }
+};
+undoStore.browserNavigateCallback = (data) => {
+  // Don't save any changes to node positions
+  // Change mode
+  if (
+    data &&
+    (data.rewriteMode === true || data.rewriteMode === false) &&
+    data.rewriteMode !== !!panelStore.rewriteMode
+  ) {
+    panelStore.rewriteMode = data.rewriteMode;
+  }
+  // Update graph
+  graphStateFullReplace(data);
 };
 const graphStateUndo = () => {
   // Save any changes to node positions without clearing redo history
@@ -161,7 +202,7 @@ const nodeMove = () => {
 };
 const recordBeforeGraphMod = () => {
   if (wereNodesMoved.value || wereNodesOrEdgesSelected()) {
-    undoStore.addEntry(makeFullGraphStateCopy(), "move nodes");
+    undoStore.insertEntry(makeFullGraphStateCopy(), "move nodes");
     wereNodesMoved.value = false;
   }
 };
@@ -180,15 +221,16 @@ const command = (code) => {
   if (!panelStore.rewriteMode) {
     // Edit mode
     switch (code) {
-      case "n":
+      case "n": {
         recordBeforeGraphMod();
-        addZNodes();
-        recordAfterGraphMod("edit:add z nodes");
+        const name = addZNodes();
+        recordAfterGraphMod(`edit:${name}`);
         break;
+      }
       case "b":
         recordBeforeGraphMod();
         addBoundaryNodes();
-        recordAfterGraphMod("edit:add boundary nodes");
+        recordAfterGraphMod("edit:new boundary node");
         break;
       case "e":
         recordBeforeGraphMod();
@@ -203,7 +245,7 @@ const command = (code) => {
       case "x":
         recordBeforeGraphMod();
         deleteSelection();
-        recordAfterGraphMod("edit: delete");
+        recordAfterGraphMod("edit:delete");
         break;
       case "a":
         recordBeforeGraphMod();
@@ -218,7 +260,7 @@ const command = (code) => {
       case "s":
         recordBeforeGraphMod();
         gops.addPathByEdges(selectedEdges.value);
-        recordAfterGraphMod("edit:add path");
+        recordAfterGraphMod("edit:new path");
         break;
       case "S":
         recordBeforeGraphMod();
@@ -229,7 +271,7 @@ const command = (code) => {
       case "clear":
         recordBeforeGraphMod();
         clearGraph();
-        recordAfterGraphMod("edit:clear");
+        recordAfterGraphMod("edit:clear graph");
         break;
       default:
         used = false;
@@ -280,7 +322,7 @@ const command = (code) => {
         window.setTimeout(() => {
           selectedNodes.value = mergedNodes; // Hack
         }, 0);
-        recordAfterGraphMod("rewrite:hadamard cancellation");
+        recordAfterGraphMod("rewrite:merge node");
         break;
       }
       case "J": {
@@ -317,7 +359,6 @@ const command = (code) => {
       case "c": // Complementation
         recordBeforeGraphMod();
         if (selectedNodes.value.length === 1) {
-          console.log(selectedNodes.value);
           const nodes = grewrite.localComplementation(selectedNodes.value[0]);
           selectedNodes.value = nodes;
           selectedEdges.value = [];
@@ -493,6 +534,7 @@ const addZNodes = () => {
     }
     selectedEdges.value = [];
     selectedNodes.value = newNodes;
+    return "insert z node";
   } else {
     let x, y;
     if (selectedNodes.value.length > 0) {
@@ -510,6 +552,7 @@ const addZNodes = () => {
     }
     // For convenience, change the selection to just the new node
     selectedNodes.value = [node];
+    return "new z node";
   }
 };
 

@@ -65,11 +65,18 @@ export const useGraphStore = defineStore("graph", {
       return this._copyData(this);
     },
     fullReplace(data) {
-      const newData = this._copyData(data);
-      overwriteDict(this.nodes, data.nodes);
-      overwriteDict(this.edges, data.edges);
-      overwriteDict(this.paths, data.paths);
-      overwriteDict(this.layouts.nodes, newData.layouts.nodes);
+      if (data) {
+        const newData = this._copyData(data);
+        overwriteDict(this.nodes, data.nodes);
+        overwriteDict(this.edges, data.edges);
+        overwriteDict(this.paths, data.paths);
+        overwriteDict(this.layouts.nodes, newData.layouts.nodes);
+      } else {
+        overwriteDict(this.nodes, {});
+        overwriteDict(this.edges, {});
+        overwriteDict(this.paths, {});
+        overwriteDict(this.layouts.nodes, {});
+      }
     },
   },
 });

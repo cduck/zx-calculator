@@ -526,7 +526,7 @@ const emit = defineEmits(["command"]);
 .panel-top-right {
   height: 100%;
   display: flex;
-  justify-content: right;
+  justify-content: flex-end;
   align-items: center;
   flex-grow: 1;
 }
