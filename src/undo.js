@@ -26,7 +26,7 @@ export class UndoHistory {
       this.popStateHandler = (e) => this._onPopState(e);
       window.addEventListener("popstate", this.popStateHandler);
     }
-    this._loadCurrentUrl(false);
+    this._loadCurrentUrl(true);
   }
 
   unload() {
@@ -95,6 +95,7 @@ export class UndoHistory {
       }
       if (found) {
         // This is in known history, go there
+        delete this.outOfHistory;
         if (this.browserNavigateCallback) {
           // Call before updating currentIndex
           this.browserNavigateCallback(this.history[this.currentIndex].data);
@@ -102,13 +103,13 @@ export class UndoHistory {
       }
     }
     if (!found) {
-      this._loadCurrentUrl(true);
+      this._loadCurrentUrl();
     }
     this.goingForward = false;
     e.preventDefault();
   }
 
-  _loadCurrentUrl(noModHistory) {
+  _loadCurrentUrl(clearLocalHistory) {
     const serial = decodeURIComponent(window.location.hash.slice(1));
     if (!serial || serial.length <= 0) {
       return;
@@ -121,9 +122,14 @@ export class UndoHistory {
       return;
     }
     this.browserNavigateCallback(data);
-    this.history = [];
-    this.currentIndex = -1;
-    this.addEntry(data, "url", true, noModHistory);
+    if (clearLocalHistory) {
+      delete this.outOfHistory;
+      this.history = [];
+      this.currentIndex = -1;
+      this.addEntry(data, "url", true, false);
+    } else {
+      this.outOfHistory = data;
+    }
   }
 
   _pushBrowserHistory(data, name, id, repBrowserHistory, noModHistory) {
@@ -150,6 +156,13 @@ export class UndoHistory {
   }
 
   addEntry(dataCopy, name, repBrowserHistory, noModHistory) {
+    if (this.outOfHistory) {
+      const oldData = this.outOfHistory;
+      delete this.outOfHistory;
+      this.history = [];
+      this.currentIndex = -1;
+      this.addEntry(oldData, "url", true, false);
+    }
     this.history.splice(this.currentIndex + 1); // Remove all redo entries
     const fingerprint = this._nextFingerprint();
     this.history.push({
@@ -169,16 +182,29 @@ export class UndoHistory {
   }
 
   updateEntry(dataCopy, name) {
-    const fingerprint = this.history[this.currentIndex].fingerprint;
-    this.history[this.currentIndex] = {
-      data: dataCopy,
-      name: name,
-      fingerprint: fingerprint,
-    };
+    let fingerprint;
+    if (this.outOfHistory) {
+      fingerprint = this._nextFingerprint();
+      this.outOfHistory = dataCopy;
+    } else {
+      fingerprint = this.history[this.currentIndex].fingerprint;
+      this.history[this.currentIndex] = {
+        data: dataCopy,
+        name: name,
+        fingerprint: fingerprint,
+      };
+    }
     this._pushBrowserHistory(dataCopy, name, fingerprint, true, false);
   }
 
   insertEntry(dataCopy, name, offset) {
+    if (this.outOfHistory) {
+      const oldData = this.outOfHistory;
+      delete this.outOfHistory;
+      this.history = [];
+      this.currentIndex = -1;
+      this.addEntry(oldData, "url", true, false);
+    }
     const fingerprint = this._nextFingerprint();
     this.history.splice(this.currentIndex + 1 + (offset || 0), 0, {
       data: dataCopy,
@@ -189,6 +215,7 @@ export class UndoHistory {
   }
 
   undo() {
+    if (this.outOfHistory) return undefined;
     if (this.currentIndex <= 0) {
       return undefined;
     }
@@ -203,6 +230,7 @@ export class UndoHistory {
   }
 
   redo() {
+    if (this.outOfHistory) return undefined;
     if (this.currentIndex >= this.history.length - 1) {
       return undefined;
     }
@@ -216,18 +244,25 @@ export class UndoHistory {
   }
 
   peek(offset) {
+    if (this.outOfHistory) {
+      if (offset === 0) return this.outOfHistory;
+      return undefined;
+    }
     return this.history[this.currentIndex + offset]?.data;
   }
 
   isTopOfHistory() {
+    if (this.outOfHistory) return true;
     return this.currentIndex >= this.history.length - 1;
   }
 
   isBottomOfHistory() {
+    if (this.outOfHistory) return true;
     return this.currentIndex <= 0;
   }
 
   isEmpty() {
+    if (this.outOfHistory) return false;
     return this.history.length <= 0;
   }
 }
