@@ -14,25 +14,26 @@ import { useStyleStore } from "@/stores/graphStyle.js";
 import { useGraphStore } from "@/stores/graph.js";
 import { UndoHistory } from "@/undo.js";
 import { GraphOps } from "@/graphOps.js";
+import { serialize, deserialize } from "@/graphSerial.js";
 import { GraphRewrite } from "@/graphRewrite.js";
 import * as angles from "@/angles.js";
 
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 const graphStore = useGraphStore();
+const gops = new GraphOps(graphStore);
+const grewrite = new GraphRewrite(gops);
 const undoStore = reactive(
   new UndoHistory({
     maxHistory: 0,
     linkToBrowser: true,
-    serialize: undefined,
-    deserialize: undefined,
+    serialize: serialize,
+    deserialize: deserialize,
     title: (data, name, inHistory) =>
       "ZX Calculator — " +
       (inHistory ? `${graphSummary(data)}, ${name}` : graphSummary(data)),
   })
 );
-const gops = new GraphOps(graphStore);
-const grewrite = new GraphRewrite(gops);
 
 const selectedNodes = ref([]);
 const selectedEdges = ref([]);
@@ -110,12 +111,20 @@ const graphStateFullReplace = (data) => {
   selectedEdges.value = [];
   graphStore.fullReplace(data);
   styleStore.view.layoutHandler.networkChanged();
-  selectedNodes.value = data.selectedNodes.filter((n) => graphStore.nodes[n]);
-  selectedEdges.value = data.selectedEdges.filter((e) => graphStore.edges[e]);
+  selectedNodes.value = (data.selectedNodes ?? []).filter(
+    (n) => graphStore.nodes[n]
+  );
+  selectedEdges.value = (data.selectedEdges ?? []).filter(
+    (e) => graphStore.edges[e]
+  );
   window.setTimeout(() => {
     // Hack fix
-    selectedNodes.value = data.selectedNodes.filter((n) => graphStore.nodes[n]);
-    selectedEdges.value = data.selectedEdges.filter((e) => graphStore.edges[e]);
+    selectedNodes.value = (data.selectedNodes ?? []).filter(
+      (n) => graphStore.nodes[n]
+    );
+    selectedEdges.value = (data.selectedEdges ?? []).filter(
+      (e) => graphStore.edges[e]
+    );
   }, 0);
 };
 let wereNodesMoved = ref(false);

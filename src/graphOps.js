@@ -24,7 +24,12 @@ export const assert = (condition, msg) => {
 
 export class GraphOps {
   constructor(graph) {
-    this.graph = graph;
+    this.graph = graph ?? {
+      nodes: {},
+      edges: {},
+      paths: {},
+      layouts: { nodes: {} },
+    };
 
     // TODO: Better indexing
     this.nextNodeIndex = Object.keys(this.graph.nodes).length + 1;

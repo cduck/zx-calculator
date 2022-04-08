@@ -47,8 +47,7 @@ export class UndoHistory {
   }
 
   _urlFragment(data) {
-    const obj = this.serialize ? this.serialize(data) : data;
-    const frag = JSON.stringify(obj);
+    const frag = this.serialize ? this.serialize(data) : JSON.stringify(data);
     const clean = frag.replaceAll("%", "%25");
     return "#" + clean;
   }
