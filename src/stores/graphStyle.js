@@ -78,7 +78,7 @@ export const useStyleStore = defineStore("graphStyle", {
         autoPanOnResize: true,
         grid: reactive({
           visible: true,
-          interval: 12.5,
+          interval: 12,
           thickIncrements: 4,
           line: {
             color: "#e0e0e0",
@@ -168,8 +168,8 @@ export const useStyleStore = defineStore("graphStyle", {
       }),
       layout: reactive({
         snapToGrid: false,
-        grid: 12.5,
-        distance: 50,
+        grid: 12,
+        distance: 12 * 4,
         newNodePositionMargin: 0, // Defaults to "distance"
         forceLayout: false,
         fixBoundaries: true,

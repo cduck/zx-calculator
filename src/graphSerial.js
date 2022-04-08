@@ -106,7 +106,7 @@ export const serialize = (data) => {
       }
       const sortedNodes = Object.entries(byAngle[angle]).sort(
         ([n1, { x: x1, y: y1 }], [n2, { x: x2, y: y2 }]) =>
-          y1 === y2 ? (x1 === x2 ? (n1 >= n2) - 0.5 : x1 - x2) : y1 - y2
+          y1 - y2 || x1 - x2 || n1.localCompare(n2, "en")
       );
       let prevX = minX;
       let prevY = minY;
@@ -150,13 +150,7 @@ export const serialize = (data) => {
   }
   const sortedEdges = Object.entries(edges).sort(
     ([e1, [t1, a1, b1]], [e2, [t2, a2, b2]]) =>
-      a1 === a2
-        ? b1 === b2
-          ? t1 === t2
-            ? (e1 > e2) - 0.5
-            : (t1 > t2) - 0.5
-          : b1 - b2
-        : a1 - a2
+      a1 - a2 || b1 - b2 || t1.localCompare(t2, "en") || e1.localCompare(e2)
   );
   // Serialize edges
   const edgeIMap = {};
@@ -184,7 +178,7 @@ export const serialize = (data) => {
       prevType = t;
     }
     chainArr.push(oneAsEmpty(b - prevTarget));
-    prevTarget = a;
+    prevTarget = b;
 
     edgeIMap[e] = edgeI;
     edgeI += 1;
@@ -254,9 +248,9 @@ export const deserialize = (str) => {
   const [argsStr, nodeStr, edgeStr, pathStr] =
     mainComponents[mainComponents.length - 1].split(";");
   // Parse node layout args
-  let [minX, minY, scaleX, scaleY] = argsStr
-    .split(",")
-    .map((s) => Number(s) || 0);
+  let [minX, minY, scaleX, scaleY] = argsStr.split(",").map(Number);
+  minX = minX || 0;
+  minY = minY || 0;
   scaleX = scaleX || 1;
   scaleY = scaleY || 1;
   // Parse nodes

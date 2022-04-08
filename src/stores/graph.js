@@ -35,12 +35,12 @@ export const useGraphStore = defineStore("graph", {
     }),
     layouts: {
       nodes: reactive({
-        node1: { x: -50, y: 0 },
+        node1: { x: -48, y: 0 },
         node2: { x: 0, y: 0 },
-        node3: { x: 50, y: 0 },
-        node4: { x: -50, y: 50 },
-        node5: { x: 0, y: 50 },
-        node6: { x: 50, y: 50 },
+        node3: { x: 48, y: 0 },
+        node4: { x: -48, y: 48 },
+        node5: { x: 0, y: 48 },
+        node6: { x: 48, y: 48 },
       }),
     },
   }),
