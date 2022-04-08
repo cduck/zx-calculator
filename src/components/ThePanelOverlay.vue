@@ -1,13 +1,8 @@
 <script setup>
 import { ref } from "vue";
-import {
-  ElButton,
-  ElSwitch,
-  ElTooltip,
-  ElRadioButton,
-  ElAutocomplete,
-} from "element-plus";
+import { ElButton, ElSwitch, ElTooltip, ElAutocomplete } from "element-plus";
 import { EditPen, Plus, Scissor } from "@element-plus/icons-vue";
+import ModalOverlay from "@/components/ModalOverlay.vue";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
 import { version, versionKind } from "@/version.js";
@@ -31,7 +26,7 @@ const emit = defineEmits(["command"]);
 <template>
   <div class="grid-container">
     <!-- Show panel button -->
-    <Transition name="panel-fade">
+    <Transition name="btn-fade">
       <div class="panelx show-btn" v-show="!show">
         <div>
           <ElButton @click="show = !show" style="width: 7ch">Show</ElButton>
@@ -69,7 +64,27 @@ const emit = defineEmits(["command"]);
             </ElButton>
           </div>
           <div class="panel-top-right">
-            <div class="version" :innerText="`${version} ${versionKind}`"></div>
+            <div class="btn-row-group">
+              <ElButton
+                class="btn"
+                @click="
+                  panelStore.modalImport.visible =
+                    !panelStore.modalImport.visible
+                "
+              >
+                Import
+              </ElButton>
+              <ElButton
+                class="btn"
+                @click="
+                  panelStore.modalExport.visible =
+                    !panelStore.modalExport.visible
+                "
+              >
+                Export
+              </ElButton>
+            </div>
+            <div class="version" :innerText="`v${version} ${versionKind}`"></div>
           </div>
         </div>
       </div>
@@ -369,6 +384,14 @@ const emit = defineEmits(["command"]);
       <div class="panelx panel-bottom" v-show="show && false"><div></div></div>
     </Transition>
   </div>
+
+  <!-- Pop-up views that cover the screen -->
+  <ModalOverlay v-model:visible="panelStore.modalImport.visible">
+    <div>Content.</div>
+  </ModalOverlay>
+  <ModalOverlay v-model:visible="panelStore.modalExport.visible">
+    <div>Content.</div>
+  </ModalOverlay>
 </template>
 
 <style scoped>
@@ -417,6 +440,9 @@ const emit = defineEmits(["command"]);
 .panely {
   opacity: 0.95;
 }
+.panelx {
+  max-width: 100%;
+}
 .panelx > div,
 .panely > div {
   padding: 5px 10px;
@@ -454,16 +480,20 @@ const emit = defineEmits(["command"]);
 .panel-top-enter-active,
 .panel-bottom-enter-active,
 .panel-left-enter-active,
-.panel-right-enter-active,
-.panel-fade-enter-active {
+.panel-right-enter-active {
   transition: transform 0.3s ease-out;
+}
+.btn-fade-enter-active {
+  transition: opacity 0.3s cubic-bezier(0, 1, 0, 1);
 }
 .panel-top-leave-active,
 .panel-bottom-leave-active,
 .panel-left-leave-active,
-.panel-right-leave-active,
-.panel-fade-leave-active {
+.panel-right-leave-active {
   transition: transform 0.3s ease-out;
+}
+.btn-fade-leave-active {
+  transition: opacity 0.3s cubic-bezier(1, 0, 1, 0);
 }
 .panel-top-enter-from,
 .panel-top-leave-to {
@@ -481,17 +511,19 @@ const emit = defineEmits(["command"]);
 .panel-right-leave-to {
   transform: translateX(calc(1 * var(--right-width) + 20px));
 }
-.panel-fade-enter-from,
-.panel-fade-leave-to {
+.btn-fade-enter-from,
+.btn-fade-leave-to {
+  opacity: 0;
 }
 
 /* Panel content */
 .panelx > div {
-  overflow: hidden;
-  overflow-x: scroll;
+  overflow: scroll;
   display: flex;
+  flex-direction: row;
   justify-content: left;
   align-items: center;
+  white-space: nowrap;
 }
 .panelx > div > * {
   margin-right: 16px;
@@ -523,14 +555,16 @@ const emit = defineEmits(["command"]);
 .btn-row-group > .btn:not(:first-child) {
   margin-left: 5px;
 }
-.panel-top-right {
+.panelx > div > .panel-top-right {
   height: 100%;
   display: flex;
   justify-content: flex-end;
   align-items: center;
   flex-grow: 1;
+  margin-right: 0px;
 }
 .version {
   color: #999;
+  margin-left: 1em;
 }
 </style>

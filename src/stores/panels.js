@@ -8,5 +8,11 @@ export const usePanelStore = defineStore("panel", {
     angleToSet: "",
     angleToAdd: "",
     angleToSplit: "",
+    modalImport: {
+      visible: false,
+    },
+    modalExport: {
+      visible: false,
+    },
   }),
 });

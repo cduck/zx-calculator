@@ -655,11 +655,12 @@ const addNodeAngles = () => {
     @pan-stop="panstop"
     @node-move="nodeMove"
   />
-  <ThePanelOverlay
-    :class="{ 'panel-inactive': overlayInactive }"
-    :checkCanDoCommand="checkCanDoCommand"
-    @command="command"
-  />
+  <div :class="{ 'panel-inactive': overlayInactive }">
+    <ThePanelOverlay
+      :checkCanDoCommand="checkCanDoCommand"
+      @command="command"
+    />
+  </div>
 </template>
 
 <style>
