@@ -242,7 +242,11 @@ const expressionToPretty = (expr) => {
     /(^|[ -@[-^`{-~])pi([ -@[-^`{-~]|$)/gu,
     (m, m1, m2) => m1 + "π" + m2
   );
-  str = str.replace(/\*?π\*?/gu, "π");
+  // Remove unneeded multiplication between single letter variable and pi
+  str = str.replace(
+    /(((([ -@[-^`{-~]|^)[^ -@[-^`{-~])|^)\*)?π/gu,
+    (_, _1, m2) => (m2 || "") + "π"
+  );
   // Replace with nice cdot symbol
   str = str.replaceAll("*", "·");
   return str;
