@@ -191,7 +191,7 @@ const wrapExprToPlusMinusPi = (expr) => {
 };
 
 const reorderMultDiv = (expr) => {
-  if (expr.op === "*" && expr.args.length === 2 && expr.args[0].name) {
+  if (expr.op === "*" && expr.args.length === 2) {
     const [left, right] = expr.args;
     if (right.value) {
       expr.args = [right, left]; // Swap number in front of letter
@@ -226,6 +226,12 @@ const expressionToPretty = (expr) => {
   str = rep2(str, /([ -/:-@[-`{-~]) +([^ -/:-@[-`{-~])/gu, repMid);
   // Remove spaces between letter-operator
   str = rep2(str, /([^ -/:-@[-`{-~]) +([ -/:-@[-`{-~])/gu, repMid);
+  // Replace spaces between letter-letter with multiply
+  str = rep2(
+    str,
+    /([^ -/:-@[-`{-~]) +([^ -/:-@[-`{-~])/gu,
+    (m, m1, m2) => m1 + "*" + m2
+  );
   // Remove * or space for implicit multiplication when number-letter or when
   // multiplying with parentheses
   str = str.replace(/([0-9.)]) *\*? *([^ -')-@[-^`{-~])/gu, repMid);
@@ -236,6 +242,7 @@ const expressionToPretty = (expr) => {
     /(^|[ -@[-^`{-~])pi([ -@[-^`{-~]|$)/gu,
     (m, m1, m2) => m1 + "π" + m2
   );
+  str = str.replace(/\*?π\*?/gu, "π");
   // Replace with nice cdot symbol
   str = str.replaceAll("*", "·");
   return str;
