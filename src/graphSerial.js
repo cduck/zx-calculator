@@ -5,6 +5,7 @@ const VALID_NODE_ZX_TYPE = {
   z: "z",
   x: "x",
   pivotA: "p",
+  unknown: "?",
 };
 const REV_NODE_ZX_TYPE = Object.fromEntries(
   Object.entries(VALID_NODE_ZX_TYPE).map(([k, v]) => [v, k])
@@ -13,6 +14,7 @@ const REV_NODE_ZX_TYPE = Object.fromEntries(
 const VALID_EDGE_ZX_TYPE = {
   normal: "n",
   hadamard: "h",
+  unknown: "?",
 };
 const REV_EDGE_ZX_TYPE = Object.fromEntries(
   Object.entries(VALID_EDGE_ZX_TYPE).map(([k, v]) => [v, k])
@@ -110,7 +112,7 @@ export const serialize = (data) => {
       }
       const sortedNodes = Object.entries(byAngle[angle]).sort(
         ([n1, { x: x1, y: y1 }], [n2, { x: x2, y: y2 }]) =>
-          y1 - y2 || x1 - x2 || n1.localCompare(n2, "en")
+          y1 - y2 || x1 - x2 || n1.localeCompare(n2, "en")
       );
       let prevX = minX;
       let prevY = minY;
@@ -154,7 +156,7 @@ export const serialize = (data) => {
   }
   const sortedEdges = Object.entries(edges).sort(
     ([e1, [t1, a1, b1]], [e2, [t2, a2, b2]]) =>
-      a1 - a2 || b1 - b2 || t1.localCompare(t2, "en") || e1.localCompare(e2)
+      a1 - a2 || b1 - b2 || t1.localeCompare(t2, "en") || e1.localeCompare(e2)
   );
   // Serialize edges
   const edgeIMap = {};

@@ -24,3 +24,13 @@ body {
 .el-popper:not(.el-autocomplete__popper) {
   pointer-events: none;
 }
+
+/* Element Plus upload file style fix */
+.el-upload-dragger {
+  border-width: 1px;
+  padding: 1px;
+}
+.el-upload-dragger.is-dragover {
+  border-width: 2px;
+  padding: 0px;
+}

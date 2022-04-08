@@ -6,7 +6,7 @@ const green = "#cfc";
 const red = "#f88";
 const black = "#000";
 const hEdgeColor = "#08f";
-const errorColor = "#f00";
+const errorColor = "#fa0";
 
 const nodeConfig = {
   type: "circle",
@@ -16,26 +16,35 @@ const nodeConfig = {
       x: 10,
       boundary: 5,
       pivotA: 8,
-      null: 7.5,
-    }[n.zxType || null]),
+    }[n.zxType] ?? 7.5),
   strokeWidth: (n) =>
     ({
       z: 1.5,
       x: 1.5,
       boundary: 1.5,
-      pivotA: 0,
-      null: 0,
-    }[n.zxType || null]),
-  strokeColor: black,
-  strokeDasharray: "0",
+      pivotA: 1.5,
+    }[n.zxType] ?? 1.5),
+  strokeColor: (n) =>
+    ({
+      z: black,
+      x: black,
+      boundary: black,
+      pivotA: hEdgeColor,
+    }[n.zxType] ?? black),
+  strokeDasharray: (n) =>
+    ({
+      z: "0",
+      x: "0",
+      boundary: "0",
+      pivotA: "4 1.027",
+    }[n.zxType] ?? "4 3.854"),
   color: (n) =>
     ({
       z: green,
       x: red,
       boundary: black,
-      pivotA: "pink",
-      null: errorColor,
-    }[n.zxType || null]),
+      pivotA: "#eee",
+    }[n.zxType] ?? errorColor),
 };
 
 const edgeConfig = {
@@ -43,20 +52,17 @@ const edgeConfig = {
     ({
       normal: 1.5,
       hadamard: 1.5,
-      null: 6,
-    }[n.zxType || null]),
+    }[n.zxType] ?? 6),
   color: (n) =>
     ({
       normal: black,
       hadamard: hEdgeColor,
-      null: errorColor,
-    }[n.zxType || null]),
+    }[n.zxType] ?? errorColor),
   dasharray: (n) =>
     ({
       normal: "",
       hadamard: "4 1",
-      null: "4 2",
-    }[n.zxType || null]),
+    }[n.zxType] ?? "4 2"),
   linecap: "butt",
   animate: false,
   animationSpeed: 50,
@@ -140,8 +146,7 @@ export const useStyleStore = defineStore("graphStyle", {
             ({
               normal: "#940",
               hadamard: "#d80",
-              null: errorColor,
-            }[n.zxType || null]),
+            }[n.zxType] ?? errorColor),
         }),
         gap: 15,
         margin: 1.5 / 2 - 4 / 2,

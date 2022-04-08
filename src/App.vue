@@ -15,6 +15,7 @@ import { useGraphStore } from "@/stores/graph.js";
 import { UndoHistory } from "@/undo.js";
 import { GraphOps } from "@/graphOps.js";
 import { serialize, deserialize } from "@/graphSerial.js";
+import { fromPyzxJson, toPyzxJson } from "@/graphConvertPyzx.js";
 import { GraphRewrite } from "@/graphRewrite.js";
 import * as angles from "@/angles.js";
 
@@ -68,7 +69,10 @@ onMounted(() => {
 
 // Catch key strokes
 const keydown = (e) => {
-  if (e.target instanceof HTMLInputElement) {
+  if (
+    e.target instanceof HTMLInputElement ||
+    e.target instanceof HTMLTextAreaElement
+  ) {
     return;
   }
   let used = false;
@@ -643,6 +647,40 @@ const addNodeAngles = () => {
     }
   }
 };
+
+// Import and export graph
+const importModalVisible = ref(false);
+const importErrorMsg = ref("");
+const importPyzx = (str) => {
+  let data;
+  try {
+    data = fromPyzxJson(str, styleStore.layout.distance);
+  } catch (e) {
+    console.error("failed to load PyZX JSON:", e);
+    importErrorMsg.value = e.message || `${e}`;
+    return;
+  }
+  if (data) {
+    recordBeforeGraphMod();
+    graphStateFullReplace(data);
+    recordAfterGraphMod("import:pyzx json");
+    importModalVisible.value = false;
+  }
+};
+
+const pyzxJsonStr = ref("");
+const exportPyzx = () => {
+  if (wereNodesMoved.value) {
+    if (undoStore.isTopOfHistory()) {
+      undoStore.addEntry(makeFullGraphStateCopy(), "move nodes");
+    } else {
+      // TODO: Don't overwrite entry name?
+      undoStore.updateEntry(makeFullGraphStateCopy(), "move nodes");
+    }
+    wereNodesMoved.value = false;
+  }
+  pyzxJsonStr.value = toPyzxJson(graphStore, styleStore.layout.distance);
+};
 </script>
 
 <template>
@@ -659,6 +697,11 @@ const addNodeAngles = () => {
     <ThePanelOverlay
       :checkCanDoCommand="checkCanDoCommand"
       @command="command"
+      @importPyzx="importPyzx"
+      @exportPyzx="exportPyzx"
+      :pyzxJsonOutStr="pyzxJsonStr"
+      v-model:importVisible="importModalVisible"
+      v-model:importErrorMsg="importErrorMsg"
     />
   </div>
 </template>

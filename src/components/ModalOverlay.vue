@@ -26,27 +26,26 @@ const emit = defineEmits(["update:visible"]);
 <style scoped>
 .modal-outer {
   display: flex;
-  background: rgba(100, 100, 100, 0.5);
+  background: rgba(150, 150, 150, 0.5);
   position: absolute;
-  top: 0;
+  top: -20px;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: calc(100vh + 40px);
   justify-content: center;
-  align-items: center;
+  align-items: left;
   overflow-y: scroll;
   overflow-x: hidden;
   padding: 0px 50px;
 }
 
 .modal-mid {
-  max-height: 100vh;
+  max-height: calc(100vh + 40px);
 }
 
 .modal-before,
 .modal-after {
-  min-height: 25px;
-  margin: auto;
+  min-height: 45px;
 }
 
 .modal-inner {
@@ -67,6 +66,6 @@ const emit = defineEmits(["update:visible"]);
 .modal-fade-enter-from,
 .modal-fade-leave-to {
   opacity: 0;
-  transform: scale(1.035);
+  transform: scale(1.0) translateY(-10px);
 }
 </style>

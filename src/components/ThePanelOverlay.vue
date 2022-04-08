@@ -1,7 +1,14 @@
 <script setup>
-import { ref } from "vue";
-import { ElButton, ElSwitch, ElTooltip, ElAutocomplete } from "element-plus";
-import { EditPen, Plus, Scissor } from "@element-plus/icons-vue";
+import { ref, computed, watch } from "vue";
+import {
+  ElInput,
+  ElButton,
+  ElSwitch,
+  ElTooltip,
+  ElAutocomplete,
+  ElUpload,
+} from "element-plus";
+import { EditPen, Plus, Scissor, UploadFilled } from "@element-plus/icons-vue";
 import ModalOverlay from "@/components/ModalOverlay.vue";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
@@ -13,14 +20,82 @@ const show = ref(true);
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 
+// Angle input text fields
 const angleSuggestions = (query, callback) => {
   callback(angles.DEFAULT_SUGGESTIONS);
 };
 
+// Import and export
+const exportVisible = ref(false);
+const pyzxJsonText = ref("");
+const theUrl = ref("");
+const exportCopyButtonLabel = ref("Copy");
+let oldSavePyzxObjUrl;
+let savePyzxExportStr;
+const abbreviateStr = (str, cut) => {
+  str = str.toString();
+  cut = cut ?? 100;
+  if (str.length < cut) return str;
+  const left = str.slice(0, Math.floor(cut / 2 - 2));
+  const right = str.slice(-Math.floor(cut / 2 - 2));
+  return `${left} … ${right}`;
+};
+const importPyzxJsonFileTriggered = (args) => {
+  args.onError(""); // Don't show the file in the list UI
+  args.file.text().then((str) => {
+    // Put text contents into text box below
+    pyzxJsonText.value = str;
+  });
+};
+const copyPyzxJsonExport = () => {
+  const showMsg = (msg) => {
+    exportCopyButtonLabel.value = msg;
+    window.clearTimeout(restoreCopyButton.id);
+    restoreCopyButton.id = window.setTimeout(restoreCopyButton, 3000);
+  };
+  navigator.clipboard.writeText(savePyzxExportStr || "").then(
+    () => {
+      showMsg("Copied!");
+    },
+    () => {
+      showMsg("Failed");
+    }
+  );
+};
+const restoreCopyButton = () => {
+  exportCopyButtonLabel.value = "Copy";
+};
+const savePyzxJsonExportLink = () => {
+  savePyzxExportStr = props.pyzxJsonOutStr;
+  const file = new Blob([savePyzxExportStr || ""], {
+    type: "application/json",
+  });
+  URL.revokeObjectURL(oldSavePyzxObjUrl);
+  oldSavePyzxObjUrl = URL.createObjectURL(file);
+  return oldSavePyzxObjUrl;
+};
+watch(exportVisible, (vis) => {
+  if (!vis) {
+    savePyzxExportStr = "";
+    URL.revokeObjectURL(oldSavePyzxObjUrl);
+  } else {
+    theUrl.value = location.href;
+  }
+});
+
 const props = defineProps({
   checkCanDoCommand: Object,
+  pyzxJsonOutStr: String,
+  importVisible: Boolean,
+  importErrorMsg: String,
 });
-const emit = defineEmits(["command"]);
+const emit = defineEmits([
+  "command",
+  "importPyzx",
+  "exportPyzx",
+  "update:importVisible",
+  "update:importErrorMsg",
+]);
 </script>
 
 <template>
@@ -68,8 +143,8 @@ const emit = defineEmits(["command"]);
               <ElButton
                 class="btn"
                 @click="
-                  panelStore.modalImport.visible =
-                    !panelStore.modalImport.visible
+                  emit('update:importErrorMsg', '');
+                  emit('update:importVisible', !importVisible);
                 "
               >
                 Import
@@ -77,14 +152,17 @@ const emit = defineEmits(["command"]);
               <ElButton
                 class="btn"
                 @click="
-                  panelStore.modalExport.visible =
-                    !panelStore.modalExport.visible
+                  emit('exportPyzx');
+                  exportVisible = !exportVisible;
                 "
               >
                 Export
               </ElButton>
             </div>
-            <div class="version" :innerText="`v${version} ${versionKind}`"></div>
+            <div
+              class="version"
+              :innerText="`v${version} ${versionKind}`"
+            ></div>
           </div>
         </div>
       </div>
@@ -386,11 +464,78 @@ const emit = defineEmits(["command"]);
   </div>
 
   <!-- Pop-up views that cover the screen -->
-  <ModalOverlay v-model:visible="panelStore.modalImport.visible">
-    <div>Content.</div>
+  <!-- Import Graph -->
+  <ModalOverlay
+    :visible="importVisible"
+    @update:visible="(v) => emit('update:importVisible', v)"
+  >
+    <div style="text-align: center; width: calc(80vw + 20px)">
+      <ElUpload
+        drag
+        accept=".json,application/json,text/json"
+        :http-request="importPyzxJsonFileTriggered"
+        action=""
+        class="wide-upload"
+      >
+        <ElIcon class="el-icon--upload"><UploadFilled /></ElIcon>
+        <div class="el-upload__text">
+          PyZX JSON<br />Drop file here or <em>click to upload</em>
+        </div>
+      </ElUpload>
+      <ElInput
+        v-model="pyzxJsonText"
+        type="textarea"
+        rows="6"
+        placeholder="or paste PyZX JSON data here"
+      />
+      <div
+        style="color: #aa0000; margin: 10px 0"
+        v-show="!!importErrorMsg"
+        :innerText="importErrorMsg"
+      ></div>
+      <ElButton
+        type="primary"
+        style="max-width: 20em; width: 100%; margin-top: 10px"
+        @click="emit('importPyzx', pyzxJsonText)"
+      >
+        Import
+      </ElButton>
+    </div>
   </ModalOverlay>
-  <ModalOverlay v-model:visible="panelStore.modalExport.visible">
-    <div>Content.</div>
+  <!-- Export Graph -->
+  <ModalOverlay v-model:visible="exportVisible">
+    <div style="text-align: center; width: calc(80vw + 20px)">
+      <div style="margin-top: 6px; margin-bottom: 10px">
+        Permalink:
+        <a :href="theUrl" :innerText="abbreviateStr(theUrl)"></a>
+      </div>
+      <ElInput
+        :value="pyzxJsonOutStr"
+        type="textarea"
+        rows="12"
+        placeholder="PyZX JSON export data"
+        readonly
+      />
+      <ElButton
+        type="primary"
+        style="max-width: 13em; width: calc(50% - 6px); margin-top: 10px"
+        @click="copyPyzxJsonExport"
+      >
+        <span :innerText="exportCopyButtonLabel"></span>
+      </ElButton>
+      <a
+        :href="savePyzxJsonExportLink()"
+        download="zx-calculator.pyzx.json"
+        style="margin-left: 12px"
+      >
+        <ElButton
+          type="primary"
+          style="max-width: 13em; width: calc(50% - 6px); margin-top: 10px"
+        >
+          Save
+        </ElButton>
+      </a>
+    </div>
   </ModalOverlay>
 </template>
 
@@ -439,6 +584,7 @@ const emit = defineEmits(["command"]);
 .panelx,
 .panely {
   opacity: 0.95;
+  color: rgb(48, 49, 51);
 }
 .panelx {
   max-width: 100%;
@@ -525,7 +671,7 @@ const emit = defineEmits(["command"]);
   align-items: center;
   white-space: nowrap;
 }
-.panelx > div > * {
+.panelx > div > *:not(:last-child) {
   margin-right: 16px;
 }
 .panely > div {
@@ -561,10 +707,16 @@ const emit = defineEmits(["command"]);
   justify-content: flex-end;
   align-items: center;
   flex-grow: 1;
-  margin-right: 0px;
 }
 .version {
   color: #999;
   margin-left: 1em;
+}
+</style>
+
+<style>
+.wide-upload .el-upload,
+.wide-upload .el-upload .el-upload-dragger {
+  width: 100%;
 }
 </style>
