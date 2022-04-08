@@ -231,12 +231,13 @@ const expressionToPretty = (expr) => {
   str = str.replace(/([0-9.)]) *\*? *([^ -')-@[-^`{-~])/gu, repMid);
   // Remove unneeded 1
   str = str.replace(/(-)1([^ -@[-^`{-~])/gu, ""); // `
-  // Replace with nice cdot symbol
-  str = str.replaceAll("*", "·");
+  // Replace with Unicode pi
   str = str.replace(
     /(^|[ -@[-^`{-~])pi([ -@[-^`{-~]|$)/gu,
     (m, m1, m2) => m1 + "π" + m2
   );
+  // Replace with nice cdot symbol
+  str = str.replaceAll("*", "·");
   return str;
 };
 
