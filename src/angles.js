@@ -236,7 +236,7 @@ const expressionToPretty = (expr) => {
   // multiplying with parentheses
   str = str.replace(/([0-9.)]) *\*? *([^ -')-@[-^`{-~])/gu, repMid);
   // Remove unneeded 1
-  str = str.replace(/(-)1([^ -@[-^`{-~])/gu, ""); // `
+  str = str.replace(/(-)1([^ -@[-^`{-~])/gu, repMid); // `
   // Replace with Unicode pi
   str = str.replace(
     /(^|[ -@[-^`{-~])pi([ -@[-^`{-~]|$)/gu,
