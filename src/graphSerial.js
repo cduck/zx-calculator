@@ -31,20 +31,24 @@ export const assert = (condition, msg) => {
   }
 };
 
+const cleanWholeNumber = (v) => {
+  const r = Math.floor(Number(v ?? 0) + 0.5);
+  const s = r.toFixed(0);
+  if (!s.match(/^-?[0-9]+$/)) return 0; // Number was probably huge
+  return r;
+};
+
+const oneAsEmpty = (v) => (v === 1 ? "" : v);
+
+const splitNoEmpty = (str, div) => (str ? str.split(div) : []);
+
 export const serialize = (data) => {
-  const cleanWholeNumber = (v) => {
-    const r = Math.floor(Number(v ?? 0) + 0.5);
-    const s = r.toFixed(0);
-    if (!s.match(/^-?[0-9]+$/)) return 0; // Number was probably huge
-    return r;
-  };
-  const oneAsEmpty = (v) => (v === 1 ? "" : v);
   const nodeEntries = Object.entries(data.nodes);
-  if (nodeEntries.length <= 0) {
+  if (!data || !data.nodes) {
     return "";
   }
-  let minX = Infinity;
-  let minY = Infinity;
+  let minX = nodeEntries.length > 0 ? Infinity : 0;
+  let minY = minX;
   const scaleX = 1;
   const scaleY = 1;
   const defaultLoc = { x: 0, y: 0 };
@@ -248,7 +252,7 @@ export const deserialize = (str) => {
   const [argsStr, nodeStr, edgeStr, pathStr] =
     mainComponents[mainComponents.length - 1].split(";");
   // Parse node layout args
-  let [minX, minY, scaleX, scaleY] = argsStr.split(",").map(Number);
+  let [minX, minY, scaleX, scaleY] = splitNoEmpty(argsStr, ",").map(Number);
   minX = minX || 0;
   minY = minY || 0;
   scaleX = scaleX || 1;
@@ -262,7 +266,7 @@ export const deserialize = (str) => {
   let prevX = minX;
   let prevY = minY;
   let gotX = false;
-  for (let entry of nodeStr.split(",")) {
+  for (let entry of splitNoEmpty(nodeStr, ",")) {
     if (entry === "" || entry === "+" || entry === "-") entry = entry + "0";
     const num = Number(entry);
     if (!isFinite(num)) {
@@ -313,7 +317,7 @@ export const deserialize = (str) => {
   let edgeI = 0;
   let edgeType = "normal";
   let prevSource = -1;
-  for (const group of edgeStr.split(",")) {
+  for (const group of splitNoEmpty(edgeStr, ",")) {
     if (group.length > 0 && group.indexOf("_") < 0) {
       // Parse type flag
       const typeAbbr = group;
@@ -362,7 +366,7 @@ export const deserialize = (str) => {
   const paths = {};
   let pathI = 0;
   let prevEdge = -1;
-  for (const group of pathStr.split(",")) {
+  for (const group of splitNoEmpty(pathStr, ",")) {
     if (group.length > 0 && group.indexOf("=") < 0) {
       // No known flags to check, ignore
       console.warn(`unknown path flag "${group}"`);

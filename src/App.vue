@@ -21,7 +21,9 @@ import * as angles from "@/angles.js";
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 const graphStore = useGraphStore();
-const gops = new GraphOps(graphStore);
+const gops = new GraphOps(graphStore, (ns) =>
+  styleStore.view.layoutHandler.setNewNodePositions(ns)
+);
 const grewrite = new GraphRewrite(gops);
 const undoStore = reactive(
   new UndoHistory({

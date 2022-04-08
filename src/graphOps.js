@@ -23,15 +23,15 @@ export const assert = (condition, msg) => {
 };
 
 export class GraphOps {
-  constructor(graph) {
+  constructor(graph, setNewNodePositions) {
     this.graph = graph ?? {
       nodes: {},
       edges: {},
       paths: {},
       layouts: { nodes: {} },
     };
+    this.setNewNodePositions = setNewNodePositions;
 
-    // TODO: Better indexing
     this.nextNodeIndex = Object.keys(this.graph.nodes).length + 1;
     this.nextEdgeIndex = Object.keys(this.graph.edges).length + 1;
     this.nextPathIndex = Object.keys(this.graph.paths).length + 1;
@@ -383,6 +383,8 @@ export class GraphOps {
     };
     if (x !== undefined && y !== undefined) {
       this.graph.layouts.nodes[nodeId] = { x: x, y: y };
+    } else if (this.setNewNodePositions) {
+      this.setNewNodePositions([nodeId]);
     }
     return nodeId;
   }
