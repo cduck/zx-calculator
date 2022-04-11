@@ -300,7 +300,11 @@ const command = (code) => {
         recordBeforeGraphMod();
         const newEdges = [];
         for (const e of selectedEdges.value) {
-          newEdges.push(...grewrite.removeHEdgeWithDegree2Nodes(e));
+          try {
+            newEdges.push(...grewrite.removeHEdgeWithDegree2Nodes(e));
+          } catch (e) {
+            console.warn(e.message);
+          }
         }
         selectedEdges.value = newEdges;
         selectedNodes.value = [];
@@ -315,7 +319,11 @@ const command = (code) => {
         const middleEdges = [];
         recordBeforeGraphMod();
         for (const e of selectedEdges.value) {
-          middleEdges.push(grewrite.hEdgeToTwoNodes(e)[1][1]);
+          try {
+            middleEdges.push(grewrite.hEdgeToTwoNodes(e)[1][1]);
+          } catch (e) {
+            console.warn(e.message);
+          }
         }
         selectedEdges.value = middleEdges;
         selectedNodes.value = [];
@@ -330,7 +338,11 @@ const command = (code) => {
         recordBeforeGraphMod();
         const mergedNodes = [];
         for (const n of selectedNodes.value) {
-          mergedNodes.push(grewrite.removeDegree2NodeWithHEdges(n));
+          try {
+            mergedNodes.push(grewrite.removeDegree2NodeWithHEdges(n));
+          } catch (e) {
+            console.warn(e.message);
+          }
         }
         selectedNodes.value = mergedNodes;
         selectedEdges.value = [];
@@ -352,18 +364,26 @@ const command = (code) => {
         }
         const newNodes = [];
         if (selectedEdges.value.length > 0) {
-          newNodes.push(
-            grewrite.splitNode(
-              undefined,
-              selectedEdges.value,
-              panelStore.angleToSplit
-            )
-          );
+          try {
+            newNodes.push(
+              grewrite.splitNode(
+                undefined,
+                selectedEdges.value,
+                panelStore.angleToSplit
+              )
+            );
+          } catch (e) {
+            console.warn(e.message);
+          }
         } else {
           for (const n of selectedNodes.value) {
-            newNodes.push(
-              grewrite.splitNode(n, undefined, panelStore.angleToSplit)
-            );
+            try {
+              newNodes.push(
+                grewrite.splitNode(n, undefined, panelStore.angleToSplit)
+              );
+            } catch (e) {
+              console.warn(e.message);
+            }
           }
         }
         selectedNodes.value = newNodes;
@@ -374,17 +394,29 @@ const command = (code) => {
       case "c": // Complementation
         recordBeforeGraphMod();
         if (selectedNodes.value.length === 1) {
-          const nodes = grewrite.localComplementation(selectedNodes.value[0]);
+          let nodes;
+          try {
+            nodes = grewrite.localComplementation(selectedNodes.value[0]);
+          } catch (e) {
+            console.error(e.message);
+          }
           selectedNodes.value = nodes;
           selectedEdges.value = [];
+          window.setTimeout(() => {
+            selectedNodes.value = nodes; // Hack
+          }, 0);
         }
         recordAfterGraphMod("rewrite:complementation");
         break;
-      case "C": // Reverse complementation
+      case "C": {
+        // Reverse complementation
         recordBeforeGraphMod();
-        //grewrite.(selectedNodes.value);
+        const newNode = grewrite.revLocalComplementation(selectedNodes.value);
+        selectedNodes.value = [newNode];
+        selectedEdges.value = [];
         recordAfterGraphMod("rewrite:reverse complementation");
         break;
+      }
       case "p": // Pivot
         recordBeforeGraphMod();
         //grewrite.(selectedNodes.value);
@@ -516,7 +548,10 @@ const checkCanDoCommand = {
     if (selectedNodes.value.length !== 1) return false;
     return grewrite.localComplementationIsValid(selectedNodes.value[0]);
   }),
-  C: computed(() => selectedNodes.value.length >= 1),
+  C: computed(() => {
+    if (selectedNodes.value.length < 1) return false;
+    return grewrite.revLocalComplementationIsValid(selectedNodes.value);
+  }),
   p: computed(
     () =>
       selectedNodes.value.length == 2 &&
@@ -681,6 +716,60 @@ const exportPyzx = () => {
   }
   pyzxJsonStr.value = toPyzxJson(graphStore, styleStore.layout.distance);
 };
+
+const svgOutStrGet = () => {
+  // Get the permalink
+  const permalink =
+    location.href.split("#", 1)[0] + undoStore._urlFragment(graphStore);
+  // Get SVG content
+  return [getAsSvg(styleStore.graph, permalink)];
+};
+// Modified from
+// https://github.com/dash14/v-network-graph/blob/ad20e27f9caf1763952356ccbc3bc63355a445d8/src/components/VNetworkGraph.vue#L719
+const getAsSvg = (vgraph, permalink) => {
+  const element = vgraph.svg;
+  const viewport = vgraph.viewport;
+  const target = element.cloneNode(true);
+  const box = viewport.getBBox();
+  const z = 1 / vgraph.scale;
+  const svg = {
+    x: Math.floor((box.x - 10) * z),
+    y: Math.floor((box.y - 10) * z),
+    width: Math.ceil((box.width + 20) * z),
+    height: Math.ceil((box.height + 20) * z),
+  };
+  target.setAttribute("width", svg.width.toString());
+  target.setAttribute("height", svg.height.toString());
+  const v = target.querySelector(".v-viewport");
+  const vb = target.querySelector(".v-background-viewport");
+  v.setAttribute("transform", `translate(${-svg.x} ${-svg.y}), scale(${z})`);
+  v.removeAttribute("style");
+  if (vb) {
+    vb.setAttribute("transform", `translate(${-svg.x} ${-svg.y}), scale(${z})`);
+    vb.removeAttribute("style");
+  }
+  target.setAttribute("viewBox", `0 0 ${svg.width} ${svg.height}`);
+  // Add link
+  const a = document.createElement("a");
+  a.href = permalink;
+  const r = document.createElement("rect");
+  r.setAttribute("width", "100%");
+  r.setAttribute("height", "100%");
+  r.setAttribute("fill", "black");
+  r.setAttribute("stroke", "none");
+  r.setAttribute("opacity", 0);
+  a.appendChild(r);
+  for (const child of [...target.childNodes]) {
+    target.removeChild(child);
+    a.appendChild(child);
+  }
+  target.appendChild(a);
+  let data = target.outerHTML;
+  // cleanup
+  data = data.replaceAll(/ data-v-[0-9a-z]+=""/g, "");
+  data = data.replaceAll(/<!--[\s\S]*?-->/gm, "");
+  return data;
+};
 </script>
 
 <template>
@@ -700,6 +789,7 @@ const exportPyzx = () => {
       @importPyzx="importPyzx"
       @exportPyzx="exportPyzx"
       :pyzxJsonOutStr="pyzxJsonStr"
+      :svgOutStrGet="svgOutStrGet"
       v-model:importVisible="importModalVisible"
       v-model:importErrorMsg="importErrorMsg"
     />

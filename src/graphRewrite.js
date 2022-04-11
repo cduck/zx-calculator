@@ -1,3 +1,5 @@
+import { ANGLE_PI_DIV2, ANGLE_PI_DIVN2 } from "@/angles.js";
+
 export function GraphRewriteException(msg) {
   this.message = msg;
 }
@@ -164,11 +166,7 @@ export class GraphRewrite {
         } else {
           const n = n1 === nOther ? n2 : n1;
           const newEdge = this.graphOps.isHadamardEdge(edge)
-            ? this.graphOps.toggleHadamardEdgeHandleSelfLoop(
-                nMerge,
-                n,
-                this.graphOps.edgeType(edge)
-              ) ?? null
+            ? this.graphOps.toggleHadamardEdgeHandleSelfLoop(nMerge, n) ?? null
             : this.graphOps.addEdge(nMerge, n, this.graphOps.edgeType(edge));
           oldTransfer.push(edge);
           newTransfer.push(newEdge);
@@ -441,7 +439,7 @@ export class GraphRewrite {
 
   // Local complementation
   // The node must be Z- or X-type and have an angle of ±π/2
-  // The node's neighbors must all be Z- or X-type and may only have Hadamard
+  // The node's neighbors must all be the same type and may only have Hadamard
   // edges between each other and the given node
   localComplementationIsValid(node) {
     try {
@@ -463,6 +461,7 @@ export class GraphRewrite {
         "node is not Z- or X-type or has a non ±π/2 angle"
       );
     }
+    const type = this.graphOps.nodeType(node);
     const angle = this.graphOps.angle(node);
     const neighbors = [];
     const starEdges = [];
@@ -473,9 +472,9 @@ export class GraphRewrite {
       if (!this.graphOps.isHadamardEdge(edge)) {
         throw new GraphRewriteException("edge is not a Hadamard edge");
       }
-      if (!this.graphOps.isZOrXNode(neighbor)) {
+      if (this.graphOps.nodeType(neighbor) !== type) {
         throw new GraphRewriteException(
-          "node is neighbor to a non Z- or X-type node"
+          "node is neighbor to a different type node"
         );
       }
       neighbors.push(neighbor);
@@ -562,16 +561,99 @@ export class GraphRewrite {
   // Reverse local complementation
   // The nodes must all be Z- or X-type and may only have Hadamard edges between
   // each other
-  revLocalComplementationIsValid(nodes) {
+  revLocalComplementationIsValid(nodes, negative) {
     try {
-      this.localComplementation(nodes, true);
+      this.revLocalComplementation(nodes, negative, true);
     } catch (e) {
       if (e instanceof GraphRewriteException) return false;
       throw e;
     }
     return true;
   }
-  revLocalComplementation(nodes, dryRun) {
+  revLocalComplementation(nodes, negative, dryRun) {
+    // Check node types
+    let nodeType;
+    if (nodes.length <= 0) {
+      nodeType = "z";
+    } else {
+      if (!this.graphOps.isZOrXNode(nodes[0])) {
+        throw new GraphRewriteException("node is not Z- or X-type");
+      }
+      nodeType = this.graphOps.nodeType(nodes[0]);
+    }
+    for (const n of nodes) {
+      if (this.graphOps.nodeType(n) !== nodeType) {
+        throw new GraphRewriteException("nodes have mismatched types");
+      }
+    }
+    // Find existing edges to remove later
+    const edgesToRemove = [];
+    const oldNodePairs = new Set();
+    this.graphOps.forInnerEdgesOfNodes(nodes, (edge) => {
+      const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+      if (!this.graphOps.isHadamardEdge(edge)) {
+        throw new GraphRewriteException("existing edge is not a Hadamard edge");
+      }
+      edgesToRemove.push(edge);
+      const pair = this.graphOps.nodePairString(n1, n2);
+      if (oldNodePairs.has(pair)) {
+        throw new GraphRewriteException("multi-edge between neighbors");
+      }
+      oldNodePairs.add(pair);
+    });
+    if (dryRun) {
+      return;
+    }
+    // Add edges
+    const newEdgeMap = {};
+    for (let i = 0; i < nodes.length; i++) {
+      const n1 = nodes[i];
+      for (let j = i + 1; j < nodes.length; j++) {
+        const n2 = nodes[j];
+        const pair = this.graphOps.nodePairString(n1, n2);
+        if (!oldNodePairs.has(pair)) {
+          newEdgeMap[pair] = this.graphOps.addHadamardEdge(n1, n2);
+        }
+      }
+    }
+    // Adjust angles
+    let xSum = 0;
+    let ySum = 0;
+    const angle = negative ? ANGLE_PI_DIVN2 : ANGLE_PI_DIV2;
+    for (const n of nodes) {
+      this.graphOps.addAngle(n, angle);
+      xSum += this.graphOps.locationX(n);
+      ySum += this.graphOps.locationY(n);
+    }
+    // Add new node
+    const centerNode = this.graphOps.addNode(
+      nodeType,
+      xSum / nodes.length,
+      ySum / nodes.length,
+      angle
+    );
+    // Add star edges
+    for (const n of nodes) {
+      this.graphOps.addHadamardEdge(centerNode, n);
+    }
+    // Remove old edges
+    this.graphOps.deleteEdges(edgesToRemove);
+    return centerNode;
+  }
+
+  // Pivot
+  // The two nodes and their neighbors must all be the same Z- or X-type
+  // and may only have Hadamard edges between each other
+  pivotIsValid(node1, node2) {
+    try {
+      this.pivot(node1, node2, true);
+    } catch (e) {
+      if (e instanceof GraphRewriteException) return false;
+      throw e;
+    }
+    return true;
+  }
+  pivot(node1, node2, dryRun) {
 
   }
 }

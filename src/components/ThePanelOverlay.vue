@@ -1,14 +1,24 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, watch } from "vue";
 import {
   ElInput,
   ElButton,
+  ElButtonGroup,
   ElSwitch,
   ElTooltip,
   ElAutocomplete,
   ElUpload,
 } from "element-plus";
-import { EditPen, Plus, Scissor, UploadFilled } from "@element-plus/icons-vue";
+import {
+  ArrowDownBold,
+  EditPen,
+  Plus,
+  Scissor,
+  UploadFilled,
+  Camera,
+  QuestionFilled,
+  FullScreen,
+} from "@element-plus/icons-vue";
 import ModalOverlay from "@/components/ModalOverlay.vue";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
@@ -27,6 +37,7 @@ const angleSuggestions = (query, callback) => {
 
 // Import and export
 const exportVisible = ref(false);
+const helpVisible = ref(false);
 const pyzxJsonText = ref("");
 const theUrl = ref("");
 const exportCopyButtonLabel = ref("Copy");
@@ -83,9 +94,20 @@ watch(exportVisible, (vis) => {
   }
 });
 
+// Save SVG image
+let oldSaveImageUrl = ref("");
+const saveImage = () => {
+  const file = new Blob(props.svgOutStrGet() || [""], {
+    type: "image/svg+xml",
+  });
+  URL.revokeObjectURL(oldSaveImageUrl.value);
+  oldSaveImageUrl.value = URL.createObjectURL(file);
+};
+
 const props = defineProps({
   checkCanDoCommand: Object,
   pyzxJsonOutStr: String,
+  svgOutStrGet: Function,
   importVisible: Boolean,
   importErrorMsg: String,
 });
@@ -93,6 +115,7 @@ const emit = defineEmits([
   "command",
   "importPyzx",
   "exportPyzx",
+  "saveImageContent",
   "update:importVisible",
   "update:importErrorMsg",
 ]);
@@ -104,7 +127,11 @@ const emit = defineEmits([
     <Transition name="btn-fade">
       <div class="panelx show-btn" v-show="!show">
         <div>
-          <ElButton @click="show = !show" style="width: 7ch">Show</ElButton>
+          <ElButton
+            @click="show = !show"
+            style="width: 6ch"
+            :icon="ArrowDownBold"
+          />
         </div>
       </div>
     </Transition>
@@ -113,7 +140,7 @@ const emit = defineEmits([
     <Transition name="panel-top">
       <div class="panelx panel-top" v-show="show">
         <div>
-          <ElButton class="btn" style="width: 7ch" @click="show = !show">
+          <ElButton class="btn" style="width: 6ch" @click="show = !show">
             Hide
           </ElButton>
           <ElSwitch
@@ -123,41 +150,48 @@ const emit = defineEmits([
             inactive-color="#eb0"
           />
           <div class="btn-row-group">
-            <ElButton
-              class="btn"
-              @click="emit('command', 'Undo')"
-              :disabled="!props.checkCanDoCommand.Undo.value"
-            >
-              Undo
-            </ElButton>
-            <ElButton
-              class="btn"
-              @click="emit('command', 'Redo')"
-              :disabled="!props.checkCanDoCommand.Redo.value"
-            >
-              Redo
-            </ElButton>
+            <ElButtonGroup>
+              <ElButton
+                class="btn"
+                @click="emit('command', 'Undo')"
+                :disabled="!props.checkCanDoCommand.Undo.value"
+              >
+                Undo
+              </ElButton>
+              <ElButton
+                class="btn"
+                @click="emit('command', 'Redo')"
+                :disabled="!props.checkCanDoCommand.Redo.value"
+              >
+                Redo
+              </ElButton>
+            </ElButtonGroup>
           </div>
           <div class="panel-top-right">
             <div class="btn-row-group">
+              <ElButtonGroup>
+                <ElButton
+                  @click="
+                    emit('update:importErrorMsg', '');
+                    emit('update:importVisible', !importVisible);
+                  "
+                >
+                  Import
+                </ElButton>
+                <ElButton
+                  @click="
+                    emit('exportPyzx');
+                    exportVisible = !exportVisible;
+                  "
+                >
+                  Export
+                </ElButton>
+              </ElButtonGroup>
               <ElButton
                 class="btn"
-                @click="
-                  emit('update:importErrorMsg', '');
-                  emit('update:importVisible', !importVisible);
-                "
-              >
-                Import
-              </ElButton>
-              <ElButton
-                class="btn"
-                @click="
-                  emit('exportPyzx');
-                  exportVisible = !exportVisible;
-                "
-              >
-                Export
-              </ElButton>
+                :icon="QuestionFilled"
+                @click="helpVisible = !helpVisible"
+              />
             </div>
             <div
               class="version"
@@ -423,18 +457,22 @@ const emit = defineEmits([
     <Transition name="panel-right">
       <div class="panely panel-right" v-show="show">
         <div>
-          Force simulation:
-          <ElSwitch
-            v-model="styleStore.layout.forceLayout"
-            inactive-text=""
-            active-text="Relax nodes"
-          />
-          <ElSwitch
-            v-model="styleStore.layout.fixBoundaries"
-            inactive-text=""
-            active-text="Fix boundaries"
-          />
-          View Settings:
+          View:
+          <ElButton
+            class="btn"
+            :icon="FullScreen"
+            @click="emit('command', 'resetView')"
+          >
+            Reset View
+          </ElButton>
+          <a
+            class="btn"
+            :href="oldSaveImageUrl"
+            target="_blank"
+            @click="saveImage()"
+          >
+            <ElButton style="width: 100%" :icon="Camera">Screenshot</ElButton>
+          </a>
           <ElSwitch
             v-model="styleStore.view.grid.visible"
             inactive-text=""
@@ -450,9 +488,17 @@ const emit = defineEmits([
             inactive-text=""
             active-text="Scale nodes"
           />
-          <ElButton class="btn" @click="emit('command', 'resetView')">
-            Reset View
-          </ElButton>
+          Force simulation:
+          <ElSwitch
+            v-model="styleStore.layout.forceLayout"
+            inactive-text=""
+            active-text="Relax nodes"
+          />
+          <ElSwitch
+            v-model="styleStore.layout.fixBoundaries"
+            inactive-text=""
+            active-text="Fix boundaries"
+          />
         </div>
       </div>
     </Transition>
@@ -536,6 +582,13 @@ const emit = defineEmits([
         </ElButton>
       </a>
     </div>
+  </ModalOverlay>
+  <!-- Help Page -->
+  <ModalOverlay v-model:visible="helpVisible">
+    <div style="text-align: center; width: calc(80vw + 20px)">
+      <h3 style="margin-top: 6px; margin-bottom: 10px">ZX Calculator — Help</h3>
+    </div>
+    <p><a href="https://zxcalculus.com/" target="_blank">zxcalculus.com</a></p>
   </ModalOverlay>
 </template>
 

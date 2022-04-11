@@ -370,7 +370,7 @@ export class GraphOps {
   }
 
   ////////// Graph operations //////////
-  addNode(zxType, x, y) {
+  addNode(zxType, x, y, angle) {
     assert(zxType, "required first argument");
     let nodeId = `node${this.nextNodeIndex}`;
     while (this.graph.nodes[nodeId]) {
@@ -381,6 +381,9 @@ export class GraphOps {
     this.graph.nodes[nodeId] = {
       zxType: zxType,
     };
+    if (angle && !isZero(angle)) {
+      this.graph.nodes[nodeId].zxAngle = angle;
+    }
     if (x !== undefined && y !== undefined) {
       this.graph.layouts.nodes[nodeId] = { x: x, y: y };
     } else if (this.setNewNodePositions) {
@@ -388,14 +391,14 @@ export class GraphOps {
     }
     return nodeId;
   }
-  addZNode(x, y) {
-    return this.addNode("z", x, y);
+  addZNode(x, y, angle) {
+    return this.addNode("z", x, y, angle);
   }
-  addXNode(x, y) {
-    return this.addNode("x", x, y);
+  addXNode(x, y, angle) {
+    return this.addNode("x", x, y, angle);
   }
-  addBoundaryNode(x, y) {
-    return this.addNode("boundary", x, y);
+  addBoundaryNode(x, y, angle) {
+    return this.addNode("boundary", x, y, angle);
   }
 
   addEdge(n1, n2, zxType) {
@@ -425,22 +428,32 @@ export class GraphOps {
   toggleHadamardEdgeHandleSelfLoop(n1, n2, dontToggle) {
     // Find existing Hadamard edges
     const edges = [];
+    let hasNormalEdge = false;
     this.forInnerEdgesOfNodes([n1, n2], (edgeId) => {
       if (this.isHadamardEdge(edgeId)) {
         edges.push(edgeId);
+      } else if (this.isNormalEdge(edgeId)) {
+        hasNormalEdge = edgeId;
       }
     });
-    this.deleteEdges(edges.slice((edges.length + !!dontToggle) % 2));
-    if (edges.length <= 0 && (edges.length + !!dontToggle) % 2 == 1) {
-      if (n1 === n2 && this.isZOrXNode(n1)) {
+    if (
+      (hasNormalEdge || n1 === n2) &&
+      this.nodeType(n1) === this.nodeType(n2) &&
+      this.isZOrXNode(n1)
+    ) {
+      this.deleteEdges(edges);
+      if ((edges.length + !dontToggle) % 2 === 1) {
         // Self loop is equal to an extra pi phase
         this.addAngle(n1, ANGLE_PI);
-        return undefined;
-      } else {
-        return this.addHadamardEdge(n1, n2);
       }
-    } else if ((edges.length + !!dontToggle) % 2 == 1) {
-      return edges[0];
+      return hasNormalEdge || undefined;
+    } else {
+      this.deleteEdges(edges.slice((edges.length + !dontToggle) % 2));
+      if (edges.length <= 0 && !dontToggle) {
+        return this.addHadamardEdge(n1, n2);
+      } else if ((edges.length + !dontToggle) % 2 == 1) {
+        return edges[0];
+      }
     }
   }
 
