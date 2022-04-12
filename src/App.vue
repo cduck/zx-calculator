@@ -379,7 +379,7 @@ const command = (code) => {
           for (const n of selectedNodes.value) {
             try {
               newNodes.push(
-                grewrite.splitNode(n, undefined, panelStore.angleToSplit)
+                grewrite.splitNode(n, "all", panelStore.angleToSplit)
               );
             } catch (e) {
               console.warn(e.message);

@@ -270,7 +270,10 @@ export class GraphRewrite {
     return true;
   }
   splitNode(node, leftEdges, leftAngle, newNodeZxType, dryRun) {
-    if (!node && (!leftEdges || leftEdges.length <= 0)) {
+    if (
+      !node &&
+      (!leftEdges || leftEdges.length <= 0 || typeof leftEdges === "string")
+    ) {
       throw new GraphRewriteException("node or leftEdges argument is required");
     }
     if (node && !this.graphOps.isZOrXNode(node)) {
@@ -283,7 +286,8 @@ export class GraphRewrite {
     let rightEdges = [];
     let leftNodes = [];
     let rightNodes = [];
-    if (leftEdges) {
+    let doGadget = false;
+    if (leftEdges && typeof leftEdges !== "string") {
       if (!node) {
         // Pick the node to split
         const nodeCounts = {};
@@ -329,6 +333,21 @@ export class GraphRewrite {
       });
       // Ignore any edges not touching the node
       leftEdges = actualLeftEdges;
+    } else if (typeof leftEdges === "string") {
+      if (leftEdges === "all") {
+        doGadget = true;
+        leftEdges = [];
+        this.graphOps.forEdgesOfNodes([node], (edge) => {
+          const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+          const neighbor = n1 === node ? n2 : n1;
+          leftEdges.push(edge);
+          leftNodes.push(neighbor);
+        });
+      } else {
+        throw new GraphRewriteException(
+          `unknown leftEdges code "${leftEdges}"`
+        );
+      }
     } else {
       // leftEdges are all edges with smaller locationX, others are right
       // (with ties broken by locationY)
@@ -360,7 +379,7 @@ export class GraphRewrite {
       }
     }
     // Calculate new node positions
-    const [nodeX, nodeY] = this.graphOps.locationXY(node);
+    let [nodeX, nodeY] = this.graphOps.locationXY(node);
     let [leftX, leftY] = this.graphOps.locationXY(node);
     for (const n of leftNodes) {
       leftX += this.graphOps.locationX(n);
@@ -380,6 +399,13 @@ export class GraphRewrite {
     rightY /= rightNodes.length + 1;
     if (Math.abs(rightX - nodeX) + Math.abs(rightY - nodeY) <= 12) {
       rightX += 24;
+    }
+    if (doGadget) {
+      [leftX, leftY] = this.graphOps.locationXY(node);
+      nodeX = leftX + 25;
+      nodeY = leftY - 25;
+      rightX = nodeX;
+      rightY = nodeY - 25;
     }
     // Add and move nodes
     const split = this.graphOps.addNode(
