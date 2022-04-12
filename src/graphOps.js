@@ -291,6 +291,23 @@ export class GraphOps {
     }
   }
 
+  // Calls callback for every edge that connects a node in A to one in B
+  forCrossingEdgesOfNodes(nodeIdsA, nodeIdsB, callback) {
+    const nodeIdSetA = nodeIdsA instanceof Set ? nodeIdsA : new Set(nodeIdsA);
+    const nodeIdSetB = nodeIdsB instanceof Set ? nodeIdsB : new Set(nodeIdsB);
+    const edges = this.graph.edges;
+    for (const edgeId of Object.keys(edges)) {
+      if (
+        (nodeIdSetA.has(edges[edgeId].source) &&
+          nodeIdSetB.has(edges[edgeId].target)) ||
+        (nodeIdSetB.has(edges[edgeId].source) &&
+          nodeIdSetA.has(edges[edgeId].target))
+      ) {
+        callback(edgeId);
+      }
+    }
+  }
+
   pathEdges(pathId) {
     return this.graph.paths[pathId].edges;
   }

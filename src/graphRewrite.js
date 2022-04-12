@@ -1,4 +1,4 @@
-import { ANGLE_PI_DIV2, ANGLE_PI_DIVN2 } from "@/angles.js";
+import { ANGLE_PI, ANGLE_PI_DIV2, ANGLE_PI_DIVN2 } from "@/angles.js";
 
 export function GraphRewriteException(msg) {
   this.message = msg;
@@ -644,16 +644,126 @@ export class GraphRewrite {
   // Pivot
   // The two nodes and their neighbors must all be the same Z- or X-type
   // and may only have Hadamard edges between each other
-  pivotIsValid(node1, node2) {
+  pivotIsValid(edge) {
     try {
-      this.pivot(node1, node2, true);
+      this.pivot(edge, true);
     } catch (e) {
       if (e instanceof GraphRewriteException) return false;
       throw e;
     }
     return true;
   }
-  pivot(node1, node2, dryRun) {
-
+  pivot(pivotEdge, dryRun) {
+    if (!this.graphOps.isHadamardEdge(pivotEdge)) {
+      throw new GraphRewriteException("pivot edge is not a Hadamard edge");
+    }
+    const [pivotA, pivotB] = this.graphOps.nodesOfEdge(pivotEdge);
+    const aIsPi = this.graphOps.hasAnglePi(pivotA);
+    const bIsPi = this.graphOps.hasAnglePi(pivotB);
+    // Check same node types
+    const type = this.graphOps.nodeType(pivotA);
+    if (!this.graphOps.isZOrXNode(pivotA)) {
+      throw new GraphRewriteException("pivot node is not Z- or X-type");
+    }
+    if (this.graphOps.nodeType(pivotB) !== type) {
+      throw new GraphRewriteException("pivot nodes have mismatched types");
+    }
+    if (
+      !this.graphOps.hasAngleZeroOrPi(pivotA) ||
+      !this.graphOps.hasAngleZeroOrPi(pivotB)
+    ) {
+      throw new GraphRewriteException(
+        "pivot node angle is not a muptiple of pi"
+      );
+    }
+    // Find neighbors
+    const allNeighborsA = [];
+    const allNeighborsB = [];
+    const starEdges = [];
+    this.graphOps.forEdgesOfNodes([pivotA, pivotB], (edge) => {
+      if (edge === pivotEdge) {
+        return; // Skip the edge between the pivot nodes
+      }
+      const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+      const onA = n1 === pivotA || n2 === pivotA;
+      const neighbor = n1 === pivotA || n1 === pivotB ? n2 : n1;
+      if (!this.graphOps.isHadamardEdge(edge)) {
+        throw new GraphRewriteException("edge is not a Hadamard edge");
+      }
+      if (this.graphOps.nodeType(neighbor) !== type) {
+        throw new GraphRewriteException(
+          "pivot node is neighbor to a different type node"
+        );
+      }
+      (onA ? allNeighborsA : allNeighborsB).push(neighbor);
+      starEdges.push(edge);
+    });
+    const setB = new Set(allNeighborsB);
+    const neighborsAB = allNeighborsA.filter((n) => setB.has(n)); // Intersect
+    const setAB = new Set(neighborsAB);
+    const neighborsA = allNeighborsA.filter((n) => !setAB.has(n));
+    const neighborsB = allNeighborsB.filter((n) => !setAB.has(n));
+    // Find existing edges to remove later
+    const edgesToRemove = [];
+    const oldNodePairs = new Set();
+    for (const [group1, group2] of [
+      [neighborsA, neighborsB],
+      [neighborsA, neighborsAB],
+      [neighborsB, neighborsAB],
+    ]) {
+      this.graphOps.forCrossingEdgesOfNodes(group1, group2, (edge) => {
+        const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+        if (!this.graphOps.isHadamardEdge(edge)) {
+          throw new GraphRewriteException(
+            "existing edge between neighbors is not a Hadamard edge"
+          );
+        }
+        edgesToRemove.push(edge);
+        const pair = this.graphOps.nodePairString(n1, n2);
+        if (oldNodePairs.has(pair)) {
+          throw new GraphRewriteException("multi-edge between pivot groups");
+        }
+        oldNodePairs.add(pair);
+      });
+    }
+    if (dryRun) {
+      return;
+    }
+    // Add edges
+    for (const [group1, group2] of [
+      [neighborsA, neighborsB],
+      [neighborsA, neighborsAB],
+      [neighborsB, neighborsAB],
+    ]) {
+      for (const n1 of group1) {
+        for (const n2 of group2) {
+          const pair = this.graphOps.nodePairString(n1, n2);
+          if (!oldNodePairs.has(pair)) {
+            this.graphOps.addHadamardEdge(n1, n2);
+          }
+        }
+      }
+    }
+    // TODO: Update any paths
+    // Update angles
+    if (bIsPi) {
+      for (const n of neighborsA) {
+        this.graphOps.addAngle(n, ANGLE_PI);
+      }
+    }
+    if (aIsPi) {
+      for (const n of neighborsB) {
+        this.graphOps.addAngle(n, ANGLE_PI);
+      }
+    }
+    if (aIsPi ^ bIsPi ^ 1) {
+      for (const n of neighborsAB) {
+        this.graphOps.addAngle(n, ANGLE_PI);
+      }
+    }
+    // Delete two pivot nodes and edges
+    this.graphOps.deleteEdges(edgesToRemove);
+    this.graphOps.deleteNodes([pivotA, pivotB]); // Also removes starEdges
+    return [...neighborsA, ...neighborsB, ...neighborsAB];
   }
 }

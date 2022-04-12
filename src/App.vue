@@ -417,11 +417,15 @@ const command = (code) => {
         recordAfterGraphMod("rewrite:reverse complementation");
         break;
       }
-      case "p": // Pivot
+      case "p": {
+        // Pivot
         recordBeforeGraphMod();
-        //grewrite.(selectedNodes.value);
+        const nodes = grewrite.pivot(selectedEdges.value[0]);
+        selectedEdges.value = [];
+        selectedNodes.value = nodes;
         recordAfterGraphMod("rewrite:pivot");
         break;
+      }
       case "P": // Reverse pivot
         recordBeforeGraphMod();
         //grewrite.(selectedNodes.value);
@@ -554,11 +558,11 @@ const checkCanDoCommand = {
   }),
   p: computed(
     () =>
-      selectedNodes.value.length == 2 &&
-      !gops.isNodeNearBoundary(selectedNodes.value[0]) &&
-      !gops.isNodeNearBoundary(selectedNodes.value[1])
+      selectedEdges.value.length == 1 &&
+      grewrite.pivotIsValid(selectedEdges.value[0])
   ),
-  P: computed(() => false), // TODO: Check A, B, and A+B selections
+  P1: computed(() => false), // TODO: Check A, B, and A+B selections
+  P2: computed(() => false), // TODO: Check A, B, and A+B selections
   // All modes
   Escape: computed(
     () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
