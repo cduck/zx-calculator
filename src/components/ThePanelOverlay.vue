@@ -41,6 +41,7 @@ const helpVisible = ref(false);
 const pyzxJsonText = ref("");
 const theUrl = ref("");
 const exportCopyButtonLabel = ref("Copy");
+const exportCopy2ButtonLabel = ref("Copy Python");
 let oldSavePyzxObjUrl;
 let savePyzxExportStr;
 const abbreviateStr = (str, cut) => {
@@ -73,8 +74,30 @@ const copyPyzxJsonExport = () => {
     }
   );
 };
+const copy2PyzxJsonExport = () => {
+  const showMsg = (msg) => {
+    exportCopy2ButtonLabel.value = msg;
+    window.clearTimeout(restoreCopy2Button.id);
+    restoreCopy2Button.id = window.setTimeout(restoreCopy2Button, 3000);
+  };
+  const safeStr = (savePyzxExportStr || "").replaceAll("'''", "???");
+  const str2 = `# Original graph: ${theUrl.value}
+g = pyzx.Graph.from_json(r'''${safeStr}''')
+pyzx.draw(g)`;
+  navigator.clipboard.writeText(str2).then(
+    () => {
+      showMsg("Copied!");
+    },
+    () => {
+      showMsg("Failed");
+    }
+  );
+};
 const restoreCopyButton = () => {
   exportCopyButtonLabel.value = "Copy";
+};
+const restoreCopy2Button = () => {
+  exportCopy2ButtonLabel.value = "Copy Python";
 };
 const savePyzxJsonExportLink = () => {
   savePyzxExportStr = props.pyzxJsonOutStr;
@@ -557,10 +580,17 @@ const emit = defineEmits([
       />
       <ElButton
         type="primary"
-        style="max-width: 13em; width: calc(50% - 6px); margin-top: 10px"
+        style="max-width: 12em; width: calc(33% - 8px); margin-top: 10px"
         @click="copyPyzxJsonExport"
       >
         <span :innerText="exportCopyButtonLabel"></span>
+      </ElButton>
+      <ElButton
+        type="primary"
+        style="max-width: 12em; width: calc(33% - 8px); margin-top: 10px"
+        @click="copy2PyzxJsonExport"
+      >
+        <span :innerText="exportCopy2ButtonLabel"></span>
       </ElButton>
       <a
         class="btn"
@@ -570,7 +600,7 @@ const emit = defineEmits([
       >
         <ElButton
           type="primary"
-          style="max-width: 13em; width: calc(50% - 6px); margin-top: 10px"
+          style="max-width: 12em; width: calc(33% - 8px); margin-top: 10px"
         >
           Save
         </ElButton>
