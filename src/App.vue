@@ -391,6 +391,7 @@ const command = (code) => {
         recordAfterGraphMod("rewrite:split node");
         break;
       }
+      case "v":
       case "c": // Complementation
         recordBeforeGraphMod();
         if (selectedNodes.value.length === 1) {
@@ -415,6 +416,18 @@ const command = (code) => {
         selectedNodes.value = [newNode];
         selectedEdges.value = [];
         recordAfterGraphMod("rewrite:reverse complementation");
+        break;
+      }
+      case "V": {
+        // Reverse complementation (negative pi/2 angle)
+        recordBeforeGraphMod();
+        const newNode = grewrite.revLocalComplementation(
+          selectedNodes.value,
+          true
+        );
+        selectedNodes.value = [newNode];
+        selectedEdges.value = [];
+        recordAfterGraphMod("rewrite:reverse complementation (-π/2)");
         break;
       }
       case "p": {
@@ -552,10 +565,12 @@ const checkCanDoCommand = {
     if (selectedNodes.value.length !== 1) return false;
     return grewrite.localComplementationIsValid(selectedNodes.value[0]);
   }),
+  v: computed(() => checkCanDoCommand.c),
   C: computed(() => {
     if (selectedNodes.value.length < 1) return false;
     return grewrite.revLocalComplementationIsValid(selectedNodes.value);
   }),
+  V: computed(() => checkCanDoCommand.C),
   p: computed(
     () =>
       selectedEdges.value.length == 1 &&
