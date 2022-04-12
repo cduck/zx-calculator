@@ -570,6 +570,7 @@ const emit = defineEmits([
         <span :innerText="exportCopyButtonLabel"></span>
       </ElButton>
       <a
+        class="btn"
         :href="savePyzxJsonExportLink()"
         download="zx-calculator.pyzx.json"
         style="margin-left: 12px"
@@ -753,6 +754,9 @@ const emit = defineEmits([
 }
 .btn-row-group > .btn:not(:first-child) {
   margin-left: 5px;
+}
+a.btn {
+  text-decoration: none;
 }
 .panelx > div > .panel-top-right {
   height: 100%;
