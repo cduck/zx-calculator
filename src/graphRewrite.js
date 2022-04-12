@@ -1,4 +1,9 @@
-import { ANGLE_PI, ANGLE_PI_DIV2, ANGLE_PI_DIVN2 } from "@/angles.js";
+import {
+  ANGLE_ZERO,
+  ANGLE_PI,
+  ANGLE_PI_DIV2,
+  ANGLE_PI_DIVN2,
+} from "@/angles.js";
 
 export function GraphRewriteException(msg) {
   this.message = msg;
@@ -363,8 +368,8 @@ export class GraphRewrite {
     }
     leftX /= leftNodes.length + 1;
     leftY /= leftNodes.length + 1;
-    if (Math.abs(leftX - nodeX) + Math.abs(leftY - nodeY) < 12.5) {
-      leftX -= 25;
+    if (Math.abs(leftX - nodeX) + Math.abs(leftY - nodeY) <= 12) {
+      leftX -= 24;
     }
     let [rightX, rightY] = this.graphOps.locationXY(node);
     for (const n of rightNodes) {
@@ -373,8 +378,8 @@ export class GraphRewrite {
     }
     rightX /= rightNodes.length + 1;
     rightY /= rightNodes.length + 1;
-    if (Math.abs(rightX - nodeX) + Math.abs(rightY - nodeY) < 12.5) {
-      rightX += 25;
+    if (Math.abs(rightX - nodeX) + Math.abs(rightY - nodeY) <= 12) {
+      rightX += 24;
     }
     // Add and move nodes
     const split = this.graphOps.addNode(
@@ -626,6 +631,10 @@ export class GraphRewrite {
       ySum += this.graphOps.locationY(n);
     }
     // Add new node
+    if (nodes.length === 1) {
+      xSum += 24;
+      ySum -= 24;
+    }
     const centerNode = this.graphOps.addNode(
       nodeType,
       xSum / nodes.length,
@@ -715,7 +724,7 @@ export class GraphRewrite {
         const [n1, n2] = this.graphOps.nodesOfEdge(edge);
         if (!this.graphOps.isHadamardEdge(edge)) {
           throw new GraphRewriteException(
-            "existing edge between neighbors is not a Hadamard edge"
+            "existing edge between neighbor groups is not a Hadamard edge"
           );
         }
         edgesToRemove.push(edge);
@@ -765,5 +774,287 @@ export class GraphRewrite {
     this.graphOps.deleteEdges(edgesToRemove);
     this.graphOps.deleteNodes([pivotA, pivotB]); // Also removes starEdges
     return [...neighborsA, ...neighborsB, ...neighborsAB];
+  }
+
+  // Reverse Pivot (2 steps)
+  // Step 1:
+  // The two nodes and their neighbors must all be the same Z- or X-type
+  // and may only have Hadamard edges between each other
+  revPivotStep1IsValid(nodes, addPi) {
+    try {
+      this.revPivotStep1(nodes, addPi, true);
+    } catch (e) {
+      if (e instanceof GraphRewriteException) return false;
+      throw e;
+    }
+    return true;
+  }
+  revPivotStep1(nodes, addPi, dryRun) {
+    // Check node types
+    let nodeType;
+    if (nodes.length <= 0) {
+      nodeType = "z";
+    } else {
+      if (!this.graphOps.isZOrXNode(nodes[0])) {
+        throw new GraphRewriteException("node is not Z- or X-type");
+      }
+      nodeType = this.graphOps.nodeType(nodes[0]);
+    }
+    let xSum = 0;
+    let ySum = 0;
+    for (const n of nodes) {
+      if (this.graphOps.nodeType(n) !== nodeType) {
+        throw new GraphRewriteException("nodes have mismatched types");
+      }
+      xSum += this.graphOps.locationX(n);
+      ySum += this.graphOps.locationY(n);
+    }
+    if (dryRun) {
+      return;
+    }
+    // Add temporary pivot node and edges
+    if (nodes.length === 1) {
+      xSum += 24;
+      ySum -= 24;
+    }
+    const pivotNode = this.graphOps.addNode(
+      "pivotA",
+      xSum / nodes.length,
+      ySum / nodes.length,
+      addPi ? ANGLE_PI : ANGLE_ZERO
+    );
+    // Add star edges
+    for (const n of nodes) {
+      this.graphOps.addHadamardEdge(pivotNode, n);
+    }
+    return pivotNode;
+  }
+
+  // Reverse Pivot (2 steps)
+  // Step 2:
+  // The two nodes and their neighbors must all be the same Z- or X-type
+  // and may only have Hadamard edges between each other
+  revPivotStep2IsValid(nodes, addPi, xB, yB) {
+    try {
+      this.revPivotStep2(nodes, addPi, xB, yB, true);
+    } catch (e) {
+      if (e instanceof GraphRewriteException) return false;
+      throw e;
+    }
+    return true;
+  }
+  revPivotStep2(nodes, addPi, xB, yB, dryRun) {
+    if (
+      nodes.length === 2 &&
+      this.graphOps.nodeType(nodes[0]) === "pivotA" &&
+      this.graphOps.nodeType(nodes[1]) === "pivotA"
+    ) {
+      // Special use case when two temporary pivot nodes are given
+      if (addPi) {
+        throw new GraphRewriteException("cannot set pi on existing pivots");
+      }
+      if (!this.graphOps.hasAngleZeroOrPi(nodes[1])) {
+        throw new GraphRewriteException(
+          "temporary pivot node angle is not a multiple of pi"
+        );
+      }
+      const newAddPi = this.graphOps.hasAnglePi(nodes[1]);
+      // Find set B nodes
+      const newArgNodes = [nodes[0]];
+      this.graphOps.forEdgesOfNodes([nodes[1]], (edge) => {
+        const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+        const neighbor = n1 === nodes[1] ? n2 : n1;
+        newArgNodes.push(neighbor);
+      });
+      // Run reverse pivot
+      const ret = this.revPivotStep2(
+        newArgNodes,
+        newAddPi,
+        this.graphOps.locationX(nodes[1]),
+        this.graphOps.locationY(nodes[1]),
+        dryRun
+      );
+      if (!dryRun) {
+        this.graphOps.deleteNodes([nodes[1]]);
+      }
+      return ret;
+    }
+    // Normal use case when a single temporary pivot and set B nodes are given
+    // Separate pivot and B nodes
+    let pivotA;
+    const nodesB = [];
+    for (const n of nodes) {
+      if (this.graphOps.nodeType(n) === "pivotA") {
+        if (pivotA) {
+          throw new GraphRewriteException("too many temporary pivot nodes");
+        }
+        pivotA = n;
+      } else {
+        nodesB.push(n);
+      }
+    }
+    if (!pivotA) {
+      throw new GraphRewriteException("no temporary pivot node given");
+    }
+    if (!this.graphOps.hasAngleZeroOrPi(pivotA)) {
+      throw new GraphRewriteException(
+        "temporary pivot node angle is not a multiple of pi"
+      );
+    }
+    const piA = this.graphOps.hasAnglePi(pivotA);
+    // Find set A nodes
+    const nodesA = [];
+    this.graphOps.forEdgesOfNodes([pivotA], (edge) => {
+      const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+      const neighbor = n1 === pivotA ? n2 : n1;
+      nodesA.push(neighbor);
+    });
+    // Run reverse pivot
+    const ret = this.revPivot(
+      nodesA,
+      nodesB,
+      piA,
+      addPi,
+      this.graphOps.locationX(pivotA),
+      this.graphOps.locationY(pivotA),
+      xB,
+      yB,
+      dryRun
+    );
+    if (!dryRun) {
+      this.graphOps.deleteNodes([pivotA]);
+    }
+    return ret;
+  }
+  revPivot(allNodesA, allNodesB, piA, piB, xA, yA, xB, yB, dryRun) {
+    // Get node sets
+    const setAllA = new Set(allNodesA);
+    const setAllB = new Set(allNodesB);
+    const nodesA = allNodesA.filter((n) => !setAllB.has(n));
+    const nodesB = allNodesB.filter((n) => !setAllA.has(n));
+    const nodesAB = allNodesA.filter((n) => setAllB.has(n));
+    const allNodes = [...allNodesA, ...nodesB];
+    // Check node types
+    let nodeType;
+    if (allNodes.length <= 0) {
+      nodeType = "z";
+    } else {
+      if (!this.graphOps.isZOrXNode(allNodes[0])) {
+        throw new GraphRewriteException("node is not Z- or X-type");
+      }
+      nodeType = this.graphOps.nodeType(allNodes[0]);
+    }
+    for (const n of allNodes) {
+      if (this.graphOps.nodeType(n) !== nodeType) {
+        throw new GraphRewriteException("nodes have mismatched types");
+      }
+    }
+    // Find existing edges to remove later
+    const edgesToRemove = [];
+    const oldNodePairs = new Set();
+    for (const [group1, group2] of [
+      [nodesA, nodesB],
+      [nodesA, nodesAB],
+      [nodesB, nodesAB],
+    ]) {
+      this.graphOps.forCrossingEdgesOfNodes(group1, group2, (edge) => {
+        const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+        if (!this.graphOps.isHadamardEdge(edge)) {
+          throw new GraphRewriteException(
+            "existing edge between neighbor groups is not a Hadamard edge"
+          );
+        }
+        edgesToRemove.push(edge);
+        const pair = this.graphOps.nodePairString(n1, n2);
+        if (oldNodePairs.has(pair)) {
+          throw new GraphRewriteException("multi-edge between pivot groups");
+        }
+        oldNodePairs.add(pair);
+      });
+    }
+    if (dryRun) {
+      return;
+    }
+    // Calculate pivot positions
+    let xSumA = 0;
+    let ySumA = 0;
+    let xSumB = 0;
+    let ySumB = 0;
+    if (xA === undefined || yA === undefined) {
+      for (const n of allNodesA) {
+        xSumA += this.graphOps.locationX(n);
+        ySumA += this.graphOps.locationY(n);
+      }
+    }
+    if (xB === undefined || yB === undefined) {
+      for (const n of allNodesB) {
+        xSumB += this.graphOps.locationX(n);
+        ySumB += this.graphOps.locationY(n);
+      }
+    }
+    if (allNodesA.length === 1) {
+      xSumA += 24;
+      ySumA -= 24;
+    }
+    if (allNodesB.length === 1) {
+      xSumB += 24;
+      ySumB -= 24;
+    }
+    if (xA === undefined) xA = xSumA / (allNodesA.length || 1);
+    if (yA === undefined) yA = ySumA / (allNodesA.length || 1);
+    if (xB === undefined) {
+      xB = allNodesB.length ? xSumB / allNodesB.length : xA + 24;
+    }
+    if (yB === undefined) {
+      yB = allNodesB.length ? ySumB / allNodesB.length : yA - 24;
+    }
+    // Add two pivot nodes and star edges
+    const angleA = piA ? ANGLE_PI : ANGLE_ZERO;
+    const angleB = piB ? ANGLE_PI : ANGLE_ZERO;
+    const pivotA = this.graphOps.addNode(nodeType, xA, yA, angleA);
+    const pivotB = this.graphOps.addNode(nodeType, xB, yB, angleB);
+    console.log(xA, yA, xB, yB);
+    for (const n of allNodesA) {
+      this.graphOps.addHadamardEdge(pivotA, n);
+    }
+    for (const n of allNodesB) {
+      this.graphOps.addHadamardEdge(pivotB, n);
+    }
+    const pivotEdge = this.graphOps.addHadamardEdge(pivotA, pivotB);
+    // Add crossing edges
+    for (const [group1, group2] of [
+      [nodesA, nodesB],
+      [nodesA, nodesAB],
+      [nodesB, nodesAB],
+    ]) {
+      for (const n1 of group1) {
+        for (const n2 of group2) {
+          const pair = this.graphOps.nodePairString(n1, n2);
+          if (!oldNodePairs.has(pair)) {
+            this.graphOps.addHadamardEdge(n1, n2);
+          }
+        }
+      }
+    }
+    // TODO: Update any paths
+    // Update angles
+    if (piB) {
+      for (const n of nodesA) {
+        this.graphOps.addAngle(n, ANGLE_PI);
+      }
+    }
+    if (piA) {
+      for (const n of nodesB) {
+        this.graphOps.addAngle(n, ANGLE_PI);
+      }
+    }
+    if (piA ^ piB ^ 1) {
+      for (const n of nodesAB) {
+        this.graphOps.addAngle(n, ANGLE_PI);
+      }
+    }
+    // Delete two pivot nodes and edges
+    this.graphOps.deleteEdges(edgesToRemove);
+    return pivotEdge;
   }
 }

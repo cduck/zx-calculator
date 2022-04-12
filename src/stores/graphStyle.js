@@ -43,7 +43,7 @@ const nodeConfig = {
       z: green,
       x: red,
       boundary: black,
-      pivotA: "#eee",
+      pivotA: "white",
     }[n.zxType] ?? errorColor),
 };
 

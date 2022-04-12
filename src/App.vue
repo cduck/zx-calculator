@@ -16,7 +16,7 @@ import { UndoHistory } from "@/undo.js";
 import { GraphOps } from "@/graphOps.js";
 import { serialize, deserialize } from "@/graphSerial.js";
 import { fromPyzxJson, toPyzxJson } from "@/graphConvertPyzx.js";
-import { GraphRewrite } from "@/graphRewrite.js";
+import { GraphRewrite, GraphRewriteException } from "@/graphRewrite.js";
 import * as angles from "@/angles.js";
 
 const panelStore = usePanelStore();
@@ -430,6 +430,7 @@ const command = (code) => {
         recordAfterGraphMod("rewrite:reverse complementation (-π/2)");
         break;
       }
+      case "o":
       case "p": {
         // Pivot
         recordBeforeGraphMod();
@@ -440,10 +441,29 @@ const command = (code) => {
         break;
       }
       case "P": // Reverse pivot
-        recordBeforeGraphMod();
-        //grewrite.(selectedNodes.value);
-        recordAfterGraphMod("rewrite:reverse pivot");
+        reversePivotStep1Or2(false);
         break;
+      case "O": // Reverse pivot (pi angle)
+        reversePivotStep1Or2(true);
+        break;
+      case "x": {
+        // Delete temporary pivot node
+        recordBeforeGraphMod();
+        const pNodes = selectedNodes.value.filter(
+          (n) => gops.nodeType(n) === "pivotA"
+        );
+        if (pNodes.length !== selectedNodes.value.length) break;
+        // Delete nodes and select their neighborhood
+        const select = [];
+        gops.forNodeCollectiveNeighborhood(pNodes, (node) => select.push(node));
+        gops.deleteNodes(pNodes);
+        selectedNodes.value = select;
+        window.setTimeout(() => {
+          selectedNodes.value = select; // Hack fix
+        }, 0);
+        recordAfterGraphMod("edit:delete");
+        break;
+      }
       default:
         used = false;
         break;
@@ -565,19 +585,26 @@ const checkCanDoCommand = {
     if (selectedNodes.value.length !== 1) return false;
     return grewrite.localComplementationIsValid(selectedNodes.value[0]);
   }),
-  v: computed(() => checkCanDoCommand.c),
+  v: computed(() => checkCanDoCommand.c.value),
   C: computed(() => {
     if (selectedNodes.value.length < 1) return false;
     return grewrite.revLocalComplementationIsValid(selectedNodes.value);
   }),
-  V: computed(() => checkCanDoCommand.C),
+  V: computed(() => checkCanDoCommand.C.value),
   p: computed(
     () =>
       selectedEdges.value.length == 1 &&
       grewrite.pivotIsValid(selectedEdges.value[0])
   ),
-  P1: computed(() => false), // TODO: Check A, B, and A+B selections
-  P2: computed(() => false), // TODO: Check A, B, and A+B selections
+  o: computed(() => checkCanDoCommand.p),
+  P1: computed(
+    () =>
+      selectedNodes.value.length >= 1 &&
+      grewrite.revPivotStep1IsValid(selectedNodes.value)
+  ),
+  P2: computed(() => grewrite.revPivotStep2IsValid(selectedNodes.value)),
+  P: computed(() => checkCanDoCommand.P1.value || checkCanDoCommand.P2.value),
+  O: computed(() => checkCanDoCommand.P),
   // All modes
   Escape: computed(
     () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
@@ -700,6 +727,25 @@ const addNodeAngles = () => {
       gops.addAngle(n, panelStore.angleToAdd);
     }
   }
+};
+
+const reversePivotStep1Or2 = (addPi) => {
+  recordBeforeGraphMod();
+  let step;
+  if (checkCanDoCommand.P2.value) {
+    // Pivot step 2
+    const edge = grewrite.revPivotStep2(selectedNodes.value, addPi);
+    step = 2;
+    selectedEdges.value = [edge];
+    selectedNodes.value = [];
+  } else {
+    // Pivot step 1
+    const node = grewrite.revPivotStep1(selectedNodes.value, addPi);
+    step = 1;
+    selectedEdges.value = [];
+    selectedNodes.value = [node];
+  }
+  recordAfterGraphMod(`rewrite:reverse pivot (step ${step})`);
 };
 
 // Import and export graph

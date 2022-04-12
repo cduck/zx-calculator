@@ -426,18 +426,20 @@ const emit = defineEmits([
             </ElButton>
           </ElTooltip>
           <ElTooltip
-            content="Reverse Pivot: Adds two nodes by toggling edges between three groups (A, B, and A ∩ B) [Shift+P or Shift+O]"
+            content="Reverse Pivot: Adds two nodes by toggling edges between three sets of nodes (A\B, B\A, and A∩B) [Shift+P or Shift+O]"
           >
             <ElButton
               class="btn"
               @click="emit('command', 'P')"
-              :disabled="!props.checkCanDoCommand.P1.value"
+              :disabled="!props.checkCanDoCommand.P.value"
             >
-              Reverse Pivot
               <span
-                :innerText="props.checkCanDoCommand.P2.value ? '2' : '1'"
-              ></span
-              >/2
+                :innerText="
+                  !props.checkCanDoCommand.P2.value
+                    ? 'Reverse Pivot (1 of 2)'
+                    : 'Reverse Pivot (2 of 2)'
+                "
+              ></span>
             </ElButton>
           </ElTooltip>
         </div>
