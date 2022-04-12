@@ -139,7 +139,7 @@ const prettyStrToParsable = (str) => {
 
 const simplifyAndWrapExpr = (str) => {
   let simp = simplify(str, { context: simplify.realContext });
-  if (simp.op === "+" || simp.op === "-") {
+  if (simp.op === "+" || (simp.op === "-" && simp.args?.length > 1)) {
     for (let i = 0; i < simp.args.length; i++) {
       simp.args[i] = wrapExprToPlusMinusPi(simp.args[i]);
     }
