@@ -1,2 +1,2 @@
-export const version = "0.0.8";
-export const versionKind = "Alpha";
+export const version = "0.1.0";
+export const versionKind = "Beta";
