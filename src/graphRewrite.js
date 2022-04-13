@@ -402,10 +402,10 @@ export class GraphRewrite {
     }
     if (doGadget) {
       [leftX, leftY] = this.graphOps.locationXY(node);
-      nodeX = leftX + 25;
-      nodeY = leftY - 25;
+      nodeX = leftX + 24;
+      nodeY = leftY - 24;
       rightX = nodeX;
-      rightY = nodeY - 25;
+      rightY = nodeY - 24;
     }
     // Add and move nodes
     const split = this.graphOps.addNode(
