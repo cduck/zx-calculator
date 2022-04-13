@@ -145,6 +145,13 @@ export class UndoHistory {
             title,
             this._urlFragment(data)
           );
+          for (let i = this.currentIndex; i >= 0; i--) {
+            if (this.history[i].browser) {
+              // This entry is not longer in browser history, replaced by data
+              delete this.history[i].browser;
+              break;
+            }
+          }
         } else {
           window.history.pushState({ id: id }, title, this._urlFragment(data));
         }
@@ -193,10 +200,11 @@ export class UndoHistory {
         fingerprint: fingerprint,
       };
     }
+    // Replace the most recent browser entry, even if older
     this._pushBrowserHistory(dataCopy, name, fingerprint, true, false);
   }
 
-  insertEntry(dataCopy, name, offset) {
+  insertEntry(dataCopy, name, offset, noModHistory) {
     if (this.outOfHistory) {
       const oldData = this.outOfHistory;
       delete this.outOfHistory;
@@ -211,6 +219,10 @@ export class UndoHistory {
       fingerprint: fingerprint,
     });
     this.currentIndex += (offset || 0) <= 0;
+    if ((offset || 0) === 0) {
+      // Replace the most recent browser entry, even if older
+      this._pushBrowserHistory(dataCopy, name, fingerprint, true, noModHistory);
+    }
   }
 
   undo() {

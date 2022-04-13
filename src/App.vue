@@ -167,11 +167,12 @@ undoStore.browserNavigateCallback = (data) => {
   }
   // Update graph
   graphStateFullReplace(data);
+  wereNodesMoved.value = false;
 };
 const graphStateUndo = () => {
   // Save any changes to node positions without clearing redo history
-  if (wereNodesMoved.value || wereNodesOrEdgesSelected()) {
-    undoStore.insertEntry(makeFullGraphStateCopy(), "move nodes");
+  if (wereNodesOrEdgesSelected()) {
+    undoStore.insertEntry(makeFullGraphStateCopy(), "select nodes", 0, true);
     wereNodesMoved.value = false;
   }
   // Check if need to change mode before undoing
@@ -188,12 +189,13 @@ const graphStateUndo = () => {
   const data = undoStore.undo();
   if (data) {
     graphStateFullReplace(data);
+    wereNodesMoved.value = false;
   }
 };
 const graphStateRedo = () => {
   // Save any changes to node positions without clearing redo history
-  if (wereNodesMoved.value || wereNodesOrEdgesSelected()) {
-    undoStore.insertEntry(makeFullGraphStateCopy(), "move nodes");
+  if (wereNodesOrEdgesSelected()) {
+    undoStore.insertEntry(makeFullGraphStateCopy(), "select nodes", 0, true);
     wereNodesMoved.value = false;
   }
   // Check if need to change mode before undoing
@@ -210,14 +212,22 @@ const graphStateRedo = () => {
   const data = undoStore.redo();
   if (data) {
     graphStateFullReplace(data);
+    wereNodesMoved.value = false;
   }
 };
 const nodeMove = () => {
+  if (wereNodesMoved.value) {
+    console.log("update");
+    undoStore.updateEntry(makeFullGraphStateCopy(), "move nodes");
+  } else {
+    console.log("insert");
+    undoStore.insertEntry(makeFullGraphStateCopy(), "move nodes");
+  }
   wereNodesMoved.value = true;
 };
 const recordBeforeGraphMod = () => {
-  if (wereNodesMoved.value || wereNodesOrEdgesSelected()) {
-    undoStore.insertEntry(makeFullGraphStateCopy(), "move nodes");
+  if (wereNodesOrEdgesSelected()) {
+    undoStore.insertEntry(makeFullGraphStateCopy(), "select nodes", 0, true);
     wereNodesMoved.value = false;
   }
 };
@@ -612,7 +622,6 @@ const checkCanDoCommand = {
   Undo: computed(
     () =>
       !undoStore.isBottomOfHistory() ||
-      wereNodesMoved.value ||
       wereNodesOrEdgesSelected()
   ),
   Redo: computed(() => !undoStore.isTopOfHistory()),
@@ -770,15 +779,6 @@ const importPyzx = (str) => {
 
 const pyzxJsonStr = ref("");
 const exportPyzx = () => {
-  if (wereNodesMoved.value) {
-    if (undoStore.isTopOfHistory()) {
-      undoStore.addEntry(makeFullGraphStateCopy(), "move nodes");
-    } else {
-      // TODO: Don't overwrite entry name?
-      undoStore.updateEntry(makeFullGraphStateCopy(), "move nodes");
-    }
-    wereNodesMoved.value = false;
-  }
   pyzxJsonStr.value = toPyzxJson(graphStore, styleStore.layout.distance);
 };
 

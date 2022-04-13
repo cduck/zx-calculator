@@ -29,7 +29,7 @@ onUnmounted(() => {
 // Graph event handers
 const eventHandlers = {
   // Watch for node move event
-  "node:pointermove": (_, event) => {
+  "node:dragend": (_, event) => {
     emit("node-move", event);
   },
 };
