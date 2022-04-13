@@ -10,11 +10,23 @@ const styleStore = useStyleStore();
 const graphElem = ref(null);
 
 // Catch pan start/stop events
-const mousedown = function (event) {
-  emit("pan-start", event);
+let mouseIsDown = false;
+let panning = false;
+const mousedown = function () {
+  mouseIsDown = true;
+};
+const pan = function (event) {
+  if (mouseIsDown && !panning) {
+    emit("pan-start", event);
+    panning = true;
+  }
 };
 const mouseup = function (event) {
-  emit("pan-stop", event);
+  if (panning) {
+    emit("pan-stop", event);
+    panning = false;
+  }
+  mouseIsDown = false;
 };
 
 // Watch and update grid snap settings
@@ -32,6 +44,18 @@ const eventHandlers = {
   "node:dragend": (_, event) => {
     emit("node-move", event);
   },
+  "node:dragstart": (_, event) => {
+    emit("node-move-start", event);
+  },
+  "view:pan": (_, event) => {
+    pan(event);
+  },
+  "node:click": (event) => {
+    emit("node-multi-click", { node: event.node, count: event.event.detail });
+  },
+  "edge:click": (event) => {
+    emit("edge-multi-click", { edge: event.edge, count: event.event.detail });
+  },
 };
 
 // Register properties
@@ -47,6 +71,9 @@ const emit = defineEmits([
   "pan-start",
   "pan-stop",
   "node-move",
+  "node-move-start",
+  "node-multi-click",
+  "edge-multi-click",
   "update:selectedNodes",
   "update:selectedEdges",
   "update:markedNodes",
@@ -57,7 +84,7 @@ const emit = defineEmits([
   <vNetworkGraph
     @mousedown="mousedown"
     @mouseup="mouseup"
-    @mouseout="mouseup"
+    @mouseleave="mouseup"
     :class="{ 'main-graph': true, edit: !panelStore.rewriteMode }"
     :nodes="graph.nodes"
     :edges="graph.edges"

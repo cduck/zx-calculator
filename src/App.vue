@@ -16,7 +16,7 @@ import { UndoHistory } from "@/undo.js";
 import { GraphOps } from "@/graphOps.js";
 import { serialize, deserialize } from "@/graphSerial.js";
 import { fromPyzxJson, toPyzxJson } from "@/graphConvertPyzx.js";
-import { GraphRewrite, GraphRewriteException } from "@/graphRewrite.js";
+import { GraphRewrite } from "@/graphRewrite.js";
 import * as angles from "@/angles.js";
 
 const panelStore = usePanelStore();
@@ -216,14 +216,16 @@ const graphStateRedo = () => {
   }
 };
 const nodeMove = () => {
+  overlayInactive.value = false;
   if (wereNodesMoved.value) {
-    console.log("update");
     undoStore.updateEntry(makeFullGraphStateCopy(), "move nodes");
   } else {
-    console.log("insert");
     undoStore.insertEntry(makeFullGraphStateCopy(), "move nodes");
   }
   wereNodesMoved.value = true;
+};
+const nodeMoveStart = () => {
+  overlayInactive.value = true;
 };
 const recordBeforeGraphMod = () => {
   if (wereNodesOrEdgesSelected()) {
@@ -234,6 +236,42 @@ const recordBeforeGraphMod = () => {
 const recordAfterGraphMod = (name) => {
   undoStore.addEntry(makeFullGraphStateCopy(true), name);
   wereNodesMoved.value = false;
+};
+const edgeMultiClick = (detail) => {
+  if (detail.count > 1) {
+    selectMultiNeighborhood(gops.nodesOfEdge(detail.edge), detail.count - 2);
+  }
+};
+const nodeMultiClick = (detail) => {
+  if (detail.count > 1) {
+    let dist =
+      selectedNodes.value.length === 0 ||
+      (selectedNodes.value.length === 1 &&
+        selectedNodes.value[0] === detail.node) ||
+      nodeMultiClick.prevCount === detail.count - 1
+        ? detail.count - 1
+        : detail.count - 2;
+    selectMultiNeighborhood([detail.node], dist);
+    nodeMultiClick.prevCount = detail.count;
+  }
+};
+const selectMultiNeighborhood = (nodes, distance) => {
+  let newNodes;
+  for (let i = 0; i < distance; i++) {
+    newNodes = new Set();
+    gops.forEdgesOfNodes(nodes, (edge) => {
+      const [n1, n2] = gops.nodesOfEdge(edge);
+      newNodes.add(n1);
+      newNodes.add(n2);
+    });
+    nodes = newNodes;
+  }
+  selectedEdges.value = [];
+  selectedNodes.value = [...nodes];
+  window.setTimeout(() => {
+    selectedEdges.value = [];
+    selectedNodes.value = [...nodes];
+  });
 };
 
 // Execute graph commands
@@ -620,9 +658,7 @@ const checkCanDoCommand = {
     () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
   ),
   Undo: computed(
-    () =>
-      !undoStore.isBottomOfHistory() ||
-      wereNodesOrEdgesSelected()
+    () => !undoStore.isBottomOfHistory() || wereNodesOrEdgesSelected()
   ),
   Redo: computed(() => !undoStore.isTopOfHistory()),
   resetView: ref(true),
@@ -846,6 +882,9 @@ const getAsSvg = (vgraph, permalink) => {
     @pan-start="panstart"
     @pan-stop="panstop"
     @node-move="nodeMove"
+    @node-move-start="nodeMoveStart"
+    @node-multi-click="nodeMultiClick"
+    @edge-multi-click="edgeMultiClick"
   />
   <div :class="{ 'panel-inactive': overlayInactive }">
     <ThePanelOverlay
