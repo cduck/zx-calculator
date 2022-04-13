@@ -88,6 +88,8 @@ const keydown = (e) => {
       used = command("Undo");
     } else if ((k === "Z" && e.shiftKey) || (k === "y" && !e.shiftKey)) {
       used = command("Redo");
+    } else if (k === "a" && !e.shiftKey) {
+      used = command("selectAll");
     }
   }
   if (used) {
@@ -536,6 +538,15 @@ const command = (code) => {
       case "Redo":
         graphStateRedo();
         break;
+      case "selectAll":
+        if (selectedEdges.value.length > 0) {
+          selectedEdges.value = Object.keys(gops.graph.edges);
+          selectedNodes.value = [];
+        } else {
+          selectedEdges.value = [];
+          selectedNodes.value = Object.keys(gops.graph.nodes);
+        }
+        break;
       default:
         used = false;
         break;
@@ -662,6 +673,7 @@ const checkCanDoCommand = {
   ),
   Redo: computed(() => !undoStore.isTopOfHistory()),
   resetView: ref(true),
+  selectAll: ref(true),
 };
 
 // Graph edit commands that adjust or use the selections before operating on the
