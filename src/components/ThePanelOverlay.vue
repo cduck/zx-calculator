@@ -18,6 +18,7 @@ import {
   Camera,
   QuestionFilled,
   FullScreen,
+  Rank,
 } from "@element-plus/icons-vue";
 import ModalOverlay from "@/components/ModalOverlay.vue";
 import { usePanelStore } from "@/stores/panels.js";
@@ -474,6 +475,15 @@ const emit = defineEmits([
       <div class="panely panel-right" v-show="show">
         <div>
           View:
+          <ElButton class="btn" @click="emit('command', 'fitView')">
+            <ElIcon
+              class="el-icon--left"
+              style="transform: rotate(45deg) scale(1.2)"
+            >
+              <Rank />
+            </ElIcon>
+            Zoom to Fit
+          </ElButton>
           <ElButton
             class="btn"
             :icon="FullScreen"

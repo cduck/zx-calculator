@@ -50,6 +50,23 @@ const panstart = () => {
 const panstop = () => {
   overlayInactive.value = false;
 };
+const zoomToFit = (maxZoom) => {
+  styleStore.graph.svgPanZoom.updateBBox();
+  if (Object.keys(gops.graph.nodes).length <= 1) {
+    const { realZoom } = styleStore.graph.svgPanZoom.getSizes();
+    styleStore.graph.svgPanZoom.zoomBy(1 / realZoom).center();
+    return;
+  }
+  const panelWidth = 200;
+  const { width } = styleStore.graph.svgPanZoom.getSizes();
+  let zoom =
+    width < 4 * panelWidth ? 1 / 1.1 : (width - 2 * panelWidth) / width;
+  styleStore.graph.svgPanZoom.fit().center().zoomBy(zoom);
+  const { realZoom } = styleStore.graph.svgPanZoom.getSizes();
+  if (maxZoom && realZoom > maxZoom) {
+    styleStore.graph.svgPanZoom.zoomBy(maxZoom / realZoom);
+  }
+};
 
 // Life cycle listeners
 onBeforeMount(() => {
@@ -523,10 +540,14 @@ const command = (code) => {
     used = true;
     // All modes
     switch (code) {
-      case "resetView":
-        styleStore.extra.zoomLevel = 1;
-        styleStore.graph?.panToCenter();
+      case "fitView":
+        zoomToFit();
         break;
+      case "resetView": {
+        const { realZoom } = styleStore.graph.svgPanZoom.getSizes();
+        styleStore.graph.svgPanZoom.zoomBy(1 / realZoom).center();
+        break;
+      }
       case "Escape":
         // Clear selection
         selectedEdges.value = [];
@@ -672,6 +693,7 @@ const checkCanDoCommand = {
     () => !undoStore.isBottomOfHistory() || wereNodesOrEdgesSelected()
   ),
   Redo: computed(() => !undoStore.isTopOfHistory()),
+  fitView: ref(true),
   resetView: ref(true),
   selectAll: ref(true),
 };
@@ -897,6 +919,7 @@ const getAsSvg = (vgraph, permalink) => {
     @node-move-start="nodeMoveStart"
     @node-multi-click="nodeMultiClick"
     @edge-multi-click="edgeMultiClick"
+    @view-load="() => zoomToFit(1)"
   />
   <div :class="{ 'panel-inactive': overlayInactive }">
     <ThePanelOverlay

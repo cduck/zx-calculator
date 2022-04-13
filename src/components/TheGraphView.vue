@@ -56,6 +56,9 @@ const eventHandlers = {
   "edge:click": (event) => {
     emit("edge-multi-click", { edge: event.edge, count: event.event.detail });
   },
+  "view:load": () => {
+    emit("view-load");
+  },
 };
 
 // Register properties
@@ -74,6 +77,7 @@ const emit = defineEmits([
   "node-move-start",
   "node-multi-click",
   "edge-multi-click",
+  "view-load",
   "update:selectedNodes",
   "update:selectedEdges",
   "update:markedNodes",
