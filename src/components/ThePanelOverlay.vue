@@ -31,6 +31,24 @@ const show = ref(true);
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 
+// Tooltip logic
+const leftTooltipTarget = ref();
+const leftTooltipVisible = ref(false);
+const leftTooltipContent = ref("");
+const leftTooltipMouseEnter = (e) => {
+  leftTooltipTarget.value = e.currentTarget;
+  leftTooltipVisible.value = true;
+  leftTooltipContent.value = e.currentTarget.getAttribute("tooltip");
+  window.clearTimeout(leftTooltipHide.id);
+};
+const leftTooltipMouseLeave = () => {
+  window.clearTimeout(leftTooltipHide.id);
+  leftTooltipHide.id = window.setTimeout(leftTooltipHide, 1000);
+};
+const leftTooltipHide = () => {
+  leftTooltipVisible.value = false;
+};
+
 // Angle input text fields
 const angleSuggestions = (query, callback) => {
   callback(angles.DEFAULT_SUGGESTIONS);
@@ -230,51 +248,83 @@ const emit = defineEmits([
     <Transition name="panel-left">
       <div class="panely panel-left" v-show="show && !panelStore.rewriteMode">
         <div>
-          <ElButton
-            class="btn"
-            @click="emit('command', 'clear')"
-            :disabled="!props.checkCanDoCommand.clear.value"
+          <ElTooltip
+            v-model:visible="leftTooltipVisible"
+            :virtual-ref="leftTooltipTarget"
+            virtual-triggering
+            trigger="hover"
+            placement="right"
+            :enterable="false"
+            popper-class="singleton-tooltip"
+            :content="leftTooltipContent"
+          ></ElTooltip>
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Delete all nodes and edges"
           >
-            Clear Graph
-          </ElButton>
-          No selection:
-          <ElTooltip content="Create a boundary node [B]">
             <ElButton
-              class="btn"
+              class="btn btn100"
+              @click="emit('command', 'clear')"
+              :disabled="!props.checkCanDoCommand.clear.value"
+            >
+              Clear Graph
+            </ElButton>
+          </div>
+          No selection:
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Create a boundary node [B]"
+          >
+            <ElButton
+              class="btn btn100"
               @click="emit('command', 'b')"
               :disabled="!props.checkCanDoCommand.b.value"
             >
               New Boundary
             </ElButton>
-          </ElTooltip>
-          <ElTooltip content="Create a Z node [N]">
+          </div>
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Create a Z node [N]"
+          >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'n')"
               :disabled="!props.checkCanDoCommand.n.value"
             >
               New Node
             </ElButton>
-          </ElTooltip>
+          </div>
           Select nodes:
-          <ElTooltip content="Toggle edges on selected nodes [E]">
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Toggle edges on selected nodes [E]"
+          >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'e')"
               :disabled="!props.checkCanDoCommand.e.value"
             >
               Toggle Edges
             </ElButton>
-          </ElTooltip>
-          <ElTooltip content="Clear edges on selected nodes [Shift+E]">
+          </div>
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Clear edges on selected nodes [Shift+E]"
+          >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'E')"
               :disabled="!props.checkCanDoCommand.E.value"
             >
               Clear Edges
             </ElButton>
-          </ElTooltip>
+          </div>
           <ElAutocomplete
             v-model="panelStore.angleToSet"
             placeholder="Set Angle"
@@ -289,8 +339,10 @@ const emit = defineEmits([
             }"
           >
             <template #append>
-              <ElTooltip
-                content="Set the angle parameter of selected non-boundary nodes [A]"
+              <div
+                @mouseenter="leftTooltipMouseEnter"
+                @mouseleave="leftTooltipMouseLeave"
+                tooltip="Set the phase angle of selected non-boundary nodes [A]"
               >
                 <ElButton
                   class="btn"
@@ -298,7 +350,7 @@ const emit = defineEmits([
                   :disabled="!props.checkCanDoCommand.a.value"
                   :icon="EditPen"
                 />
-              </ElTooltip>
+              </div>
             </template>
           </ElAutocomplete>
           <ElAutocomplete
@@ -314,8 +366,10 @@ const emit = defineEmits([
             }"
           >
             <template #append>
-              <ElTooltip
-                content="Add to the current angle of selected non-boundary nodes [Shift+A]"
+              <div
+                @mouseenter="leftTooltipMouseEnter"
+                @mouseleave="leftTooltipMouseLeave"
+                tooltip="Add this value to the current phase angle of selected non-boundary nodes [Shift+A]"
               >
                 <ElButton
                   class="btn"
@@ -323,40 +377,50 @@ const emit = defineEmits([
                   :disabled="!props.checkCanDoCommand.A.value"
                   :icon="Plus"
                 />
-              </ElTooltip>
+              </div>
             </template>
           </ElAutocomplete>
           Any selection:
-          <ElTooltip content="Delete selected nodes or edges [X]">
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Delete selected nodes or edges [X]"
+          >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'x')"
               :disabled="!props.checkCanDoCommand.x.value"
             >
               Delete
             </ElButton>
-          </ElTooltip>
+          </div>
           Sequential edges:
-          <ElTooltip content="Define a path from input to output boundary [S]">
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Define a path from input to output boundary [S]"
+          >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 's')"
               :disabled="!props.checkCanDoCommand.s.value"
             >
               Define Path
             </ElButton>
-          </ElTooltip>
-          <ElTooltip
-            content="Remove all paths touching selected edges [Shift+S]"
+          </div>
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Remove all paths touching selected edges [Shift+S]"
           >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'S')"
               :disabled="!props.checkCanDoCommand.S.value"
             >
               Clear Path
             </ElButton>
-          </ElTooltip>
+          </div>
         </div>
       </div>
     </Transition>
@@ -366,39 +430,45 @@ const emit = defineEmits([
       <div class="panely panel-left" v-show="show && panelStore.rewriteMode">
         <div>
           Select single edge:
-          <ElTooltip
-            content="Hadamard Cancellation: Removes a Hadamard edge between degree-2 nodes [H]"
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Hadamard Cancellation: Removes a Hadamard edge between degree-2 nodes [H]"
           >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'h')"
               :disabled="!props.checkCanDoCommand.h.value"
             >
               Remove Edge+Nodes
             </ElButton>
-          </ElTooltip>
-          <ElTooltip
-            content="Reverse Hadamard Cancellation: Inserts two Hadamard edges by adding two Z nodes [Shift+H]"
+          </div>
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Reverse Hadamard Cancellation: Inserts two Hadamard edges by adding two Z nodes [Shift+H]"
           >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'H')"
               :disabled="!props.checkCanDoCommand.H.value"
             >
               Insert 2 Nodes
             </ElButton>
-          </ElTooltip>
-          <ElTooltip
-            content="Pivot: Removes two nodes with angles 0 or π by toggling certain edges between their neighbors [P]"
+          </div>
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Pivot: Removes two nodes with angles 0 or π by toggling certain edges between their neighbors [P]"
           >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'p')"
               :disabled="!props.checkCanDoCommand.p.value"
             >
               Pivot
             </ElButton>
-          </ElTooltip>
+          </div>
           Select edges from node:
           <ElAutocomplete
             v-model="panelStore.angleToSplit"
@@ -414,8 +484,10 @@ const emit = defineEmits([
             }"
           >
             <template #append>
-              <ElTooltip
-                content="Splits a node into two nodes (connected by a degree-2 node) with the selected edges all on one side [Shift+J]"
+              <div
+                @mouseenter="leftTooltipMouseEnter"
+                @mouseleave="leftTooltipMouseLeave"
+                tooltip="Splits a node into two nodes (connected by a degree-2 node) with the selected edges all on one side [Shift+J]"
               >
                 <ElButton
                   class="btn"
@@ -423,49 +495,57 @@ const emit = defineEmits([
                   :disabled="!props.checkCanDoCommand.J.value"
                   :icon="Scissor"
                 />
-              </ElTooltip>
+              </div>
             </template>
           </ElAutocomplete>
           Select single node:
-          <ElTooltip
-            content="Identity Removal: Removes a degree-2 node by merging its neighbors [J]"
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Identity Removal: Removes a degree-2 node by merging its neighbors [J]"
           >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'j')"
               :disabled="!props.checkCanDoCommand.j.value"
             >
               Remove Degree-2
             </ElButton>
-          </ElTooltip>
-          <ElTooltip
-            content="Local Complementation: Removes a ±π/2 node by toggling all edges between its neighbors and adding ∓π/2 [C]"
+          </div>
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Local Complementation: Removes a ±π/2 node by toggling all edges between its neighbors and adding ∓π/2 [C]"
           >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'c')"
               :disabled="!props.checkCanDoCommand.c.value"
             >
               Complementation
             </ElButton>
-          </ElTooltip>
+          </div>
           Select multiple nodes:
-          <ElTooltip
-            content="Reverse Complementation: Adds a ±π/2 node connected to the selected nodes by toggling all edges and adding ±π/2 [Shift+C or Shift+V]"
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Reverse Complementation: Adds a ±π/2 node connected to the selected nodes by toggling all edges and adding ±π/2 [Shift+C or Shift+V]"
           >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'C')"
               :disabled="!props.checkCanDoCommand.C.value"
             >
               Rev. Complementation
             </ElButton>
-          </ElTooltip>
-          <ElTooltip
-            content="Reverse Pivot: Adds two nodes by toggling edges between three sets of nodes (A\B, B\A, and A∩B) [Shift+P or Shift+O]"
+          </div>
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Reverse Pivot: Adds two nodes by toggling edges between three sets of nodes (A\B, B\A, and A∩B) [Shift+P or Shift+O]"
           >
             <ElButton
-              class="btn"
+              class="btn btn100"
               @click="emit('command', 'P')"
               :disabled="!props.checkCanDoCommand.P.value"
             >
@@ -477,7 +557,7 @@ const emit = defineEmits([
                 "
               ></span>
             </ElButton>
-          </ElTooltip>
+          </div>
         </div>
       </div>
     </Transition>
@@ -793,6 +873,9 @@ const emit = defineEmits([
   margin-right: 0;
   width: 3ch;
 }
+.btn100 {
+  width: 100%;
+}
 .sld {
   padding-left: 10px;
   padding-right: 10px;
@@ -820,5 +903,7 @@ a.btn {
 .wide-upload .el-upload,
 .wide-upload .el-upload .el-upload-dragger {
   width: 100%;
+}
+.singleton-tooltip {
 }
 </style>

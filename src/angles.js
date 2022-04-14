@@ -101,6 +101,7 @@ export const DEFAULT_SUGGESTIONS = [
   { value: "-3π/4" },
   { value: "-π/2" },
   { value: "-π/4" },
+  { value: "variable" },
 ];
 
 export const isZero = (prettyStr) => {
