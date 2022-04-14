@@ -43,7 +43,7 @@ const leftTooltipMouseEnter = (e) => {
 };
 const leftTooltipMouseLeave = () => {
   window.clearTimeout(leftTooltipHide.id);
-  leftTooltipHide.id = window.setTimeout(leftTooltipHide, 1000);
+  leftTooltipHide.id = window.setTimeout(leftTooltipHide, 100);
 };
 const leftTooltipHide = () => {
   leftTooltipVisible.value = false;
@@ -257,6 +257,7 @@ const emit = defineEmits([
             :enterable="false"
             popper-class="singleton-tooltip"
             :content="leftTooltipContent"
+            raw-content
           ></ElTooltip>
           <div
             @mouseenter="leftTooltipMouseEnter"
@@ -302,7 +303,7 @@ const emit = defineEmits([
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Toggle edges on selected nodes [E]"
+            tooltip="Toggle edges between every selected node [E]"
           >
             <ElButton
               class="btn btn100"
@@ -315,7 +316,7 @@ const emit = defineEmits([
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Clear edges on selected nodes [Shift+E]"
+            tooltip="Delete edges between every selected node [Shift+E]"
           >
             <ElButton
               class="btn btn100"
@@ -342,7 +343,7 @@ const emit = defineEmits([
               <div
                 @mouseenter="leftTooltipMouseEnter"
                 @mouseleave="leftTooltipMouseLeave"
-                tooltip="Set the phase angle of selected non-boundary nodes [A]"
+                tooltip="Set the phase angle of selected non-boundary nodes to this value or expression [A]"
               >
                 <ElButton
                   class="btn"
@@ -369,7 +370,7 @@ const emit = defineEmits([
               <div
                 @mouseenter="leftTooltipMouseEnter"
                 @mouseleave="leftTooltipMouseLeave"
-                tooltip="Add this value to the current phase angle of selected non-boundary nodes [Shift+A]"
+                tooltip="Add this value or expression to the phase angle of selected non-boundary nodes [Shift+A]"
               >
                 <ElButton
                   class="btn"
@@ -384,7 +385,7 @@ const emit = defineEmits([
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Delete selected nodes or edges [X]"
+            tooltip="Delete all selected nodes or edges [X]"
           >
             <ElButton
               class="btn btn100"
@@ -411,7 +412,7 @@ const emit = defineEmits([
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Remove all paths touching selected edges [Shift+S]"
+            tooltip="Remove paths that use any selected edges [Shift+S]"
           >
             <ElButton
               class="btn btn100"
@@ -433,7 +434,7 @@ const emit = defineEmits([
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Hadamard Cancellation: Removes a Hadamard edge between degree-2 nodes [H]"
+            tooltip="Hadamard Cancellation:<br />Remove a Hadamard edge between degree-2 nodes [H]"
           >
             <ElButton
               class="btn btn100"
@@ -446,7 +447,7 @@ const emit = defineEmits([
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Reverse Hadamard Cancellation: Inserts two Hadamard edges by adding two Z nodes [Shift+H]"
+            tooltip="Reverse Hadamard Cancellation:<br />Insert two Hadamard edges by adding two Z nodes [Shift+H]"
           >
             <ElButton
               class="btn btn100"
@@ -459,7 +460,7 @@ const emit = defineEmits([
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Pivot: Removes two nodes with angles 0 or π by toggling certain edges between their neighbors [P]"
+            tooltip="Pivot:<br />Remove a pair of adjacent nodes (A and B, must have angles 0 or π) by toggling Hadamard edges between three sets of their neighbors (neigbors of both, neighbors of only A, neighbors of only B) [P]"
           >
             <ElButton
               class="btn btn100"
@@ -487,7 +488,7 @@ const emit = defineEmits([
               <div
                 @mouseenter="leftTooltipMouseEnter"
                 @mouseleave="leftTooltipMouseLeave"
-                tooltip="Splits a node into two nodes (connected by a degree-2 node) with the selected edges all on one side [Shift+J]"
+                tooltip="Split a node into two nodes (connected by a degree-2 node) with the selected edges (and given angle) separated from its other edges [Shift+J]"
               >
                 <ElButton
                   class="btn"
@@ -502,7 +503,7 @@ const emit = defineEmits([
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Identity Removal: Removes a degree-2 node by merging its neighbors [J]"
+            tooltip="Identity Removal:<br />Remove a degree-2 node by merging its two neighbors [J]"
           >
             <ElButton
               class="btn btn100"
@@ -515,7 +516,7 @@ const emit = defineEmits([
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Local Complementation: Removes a ±π/2 node by toggling all edges between its neighbors and adding ∓π/2 [C]"
+            tooltip="Local Complementation:<br />Remove a ±π/2 node by toggling Hadamard edges between all neighbors and adding ∓π/2 to each neighbor's angle [C]"
           >
             <ElButton
               class="btn btn100"
@@ -529,7 +530,7 @@ const emit = defineEmits([
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Reverse Complementation: Adds a ±π/2 node connected to the selected nodes by toggling all edges and adding ±π/2 [Shift+C or Shift+V]"
+            tooltip="Reverse Complementation:<br />Add a new ±π/2 node connected to every selected node by toggling Hadamard edges between all nodes and adding ±π/2 to each node's angle [Shift+C or Shift+V]"
           >
             <ElButton
               class="btn btn100"
@@ -542,7 +543,7 @@ const emit = defineEmits([
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Reverse Pivot: Adds two nodes by toggling edges between three sets of nodes (A\B, B\A, and A∩B) [Shift+P or Shift+O]"
+            tooltip="Reverse Pivot:<br />Add a pair of nodes (A and B, with angles 0 or π) by toggling Hadamard edges between three sets of nodes (neigbors of both, neighbors of only A, neighbors of only B) [Shift+P or Shift+O]<br /><br />Step 1 selection: the desired neighbors of node A<br />Step 2 selection: the temorary pivot node and the desired neighbors of node B"
           >
             <ElButton
               class="btn btn100"
@@ -904,6 +905,8 @@ a.btn {
 .wide-upload .el-upload .el-upload-dragger {
   width: 100%;
 }
+
 .singleton-tooltip {
+  max-width: 240px;
 }
 </style>
