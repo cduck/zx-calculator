@@ -100,7 +100,7 @@ export const useStyleStore = defineStore("graphStyle", {
       }),
       node: reactive({
         draggable: true,
-        selectable: true,
+        selectable: false, // Selection manually controlled through events
         normal: nodeConfig,
         hover: nodeConfig,
         selected: nodeConfig,
@@ -137,7 +137,7 @@ export const useStyleStore = defineStore("graphStyle", {
         },
       }),
       edge: reactive({
-        selectable: true,
+        selectable: false, // Selection manually controlled through events
         normal: edgeConfig,
         hover: edgeConfig,
         selected: Object.assign({}, edgeConfig, {

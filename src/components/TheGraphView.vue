@@ -51,10 +51,18 @@ const eventHandlers = {
     pan(event);
   },
   "node:click": (event) => {
-    emit("node-multi-click", { node: event.node, count: event.event.detail });
+    emit("node-multi-click", {
+      node: event.node,
+      count: event.event.detail,
+      event: event.event,
+    });
   },
   "edge:click": (event) => {
-    emit("edge-multi-click", { edge: event.edge, count: event.event.detail });
+    emit("edge-multi-click", {
+      edge: event.edge,
+      count: event.event.detail,
+      event: event.event,
+    });
   },
   "view:load": () => {
     emit("view-load");

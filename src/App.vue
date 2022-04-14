@@ -263,24 +263,51 @@ const recordAfterGraphMod = (name) => {
   wereNodesMoved.value = false;
 };
 const edgeMultiClick = (detail) => {
-  if (detail.count > 1) {
+  console.log("click");
+  const e = detail.event;
+  if (detail.count === 1) {
+    if (e?.shiftKey || e?.metaKey || e?.shiftKey) {
+      if (selectedNodes.value.length > 0) return;
+      const newEdges = selectedEdges.value.filter((e) => e !== detail.edge);
+      if (newEdges.length === selectedEdges.value.length) {
+        newEdges.push(detail.edge);
+      }
+      selectedEdges.value = newEdges;
+    } else if (selectedEdges.value.indexOf(detail.edge) < 0) {
+      selectedEdges.value = [detail.edge];
+    }
+  } else if (detail.count > 1) {
     selectMultiNeighborhood(gops.nodesOfEdge(detail.edge), detail.count - 2);
   }
 };
 const nodeMultiClick = (detail) => {
-  if (detail.count > 1) {
-    let dist =
-      selectedNodes.value.length === 0 ||
-      (selectedNodes.value.length === 1 &&
-        selectedNodes.value[0] === detail.node) ||
-      nodeMultiClick.prevCount === detail.count - 1
-        ? detail.count - 1
-        : detail.count - 2;
+  const e = detail.event;
+  if (detail.count === 1) {
+    if (e?.shiftKey || e?.metaKey || e?.shiftKey) {
+      if (selectedEdges.value.length > 0) return;
+      const newNodes = selectedNodes.value.filter((n) => n !== detail.node);
+      if (newNodes.length === selectedNodes.value.length) {
+        newNodes.push(detail.node);
+      }
+      selectedNodes.value = newNodes;
+    } else if (selectedNodes.value.indexOf(detail.node) < 0) {
+      selectedNodes.value = [detail.node];
+    }
+  } else if (detail.count > 1) {
+    if (detail.count - 1 !== nodeMultiClick.prevCount) {
+      if (selectedNodes.value.indexOf(detail.node) >= 0) {
+        nodeMultiClick.distDelay = detail.count - 1;
+      } else {
+        nodeMultiClick.distDelay = detail.count;
+      }
+    }
+    const dist = detail.count - nodeMultiClick.distDelay;
     selectMultiNeighborhood([detail.node], dist);
     nodeMultiClick.prevCount = detail.count;
   }
 };
 const selectMultiNeighborhood = (nodes, distance) => {
+  nodes = new Set(nodes);
   let newNodes;
   for (let i = 0; i < distance; i++) {
     newNodes = new Set();
@@ -291,12 +318,15 @@ const selectMultiNeighborhood = (nodes, distance) => {
     });
     nodes = newNodes;
   }
+  for (const n of selectedNodes.value) {
+    nodes.add(n);
+  }
   selectedEdges.value = [];
   selectedNodes.value = [...nodes];
   window.setTimeout(() => {
     selectedEdges.value = [];
     selectedNodes.value = [...nodes];
-  });
+  }, 0);
 };
 
 // Execute graph commands
