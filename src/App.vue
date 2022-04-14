@@ -93,7 +93,13 @@ const keydown = (e) => {
     return;
   }
   let used = false;
-  let k = e.key;
+  const code = e.which || e.charCode || e.keyCode || 0;
+  let k =
+    code < 32
+      ? e.code || e.key
+      : e.shiftKey
+      ? String.fromCharCode(code).toUpperCase()
+      : String.fromCharCode(code).toLowerCase();
   if (!e.altKey && !e.ctrlKey && !e.metaKey) {
     // Allow backspace or 'x'
     if (k === "Backspace") {
