@@ -279,10 +279,14 @@ const emit = defineEmits([
             v-model="panelStore.angleToSet"
             placeholder="Set Angle"
             :fetch-suggestions="angleSuggestions"
+            @select="() => emit('command', 'a')"
             :trigger-on-focus="true"
             clearable
             hide-loading
-            class="inline-input"
+            :class="{
+              'inline-input': true,
+              'disable-btn': !props.checkCanDoCommand.a.value,
+            }"
           >
             <template #append>
               <ElTooltip
@@ -301,9 +305,13 @@ const emit = defineEmits([
             v-model="panelStore.angleToAdd"
             placeholder="Add Angle"
             :fetch-suggestions="angleSuggestions"
+            @select="() => emit('command', 'A')"
             :trigger-on-focus="true"
             clearable
-            class="inline-input"
+            :class="{
+              'inline-input': true,
+              'disable-btn': !props.checkCanDoCommand.A.value,
+            }"
           >
             <template #append>
               <ElTooltip
@@ -396,10 +404,14 @@ const emit = defineEmits([
             v-model="panelStore.angleToSplit"
             placeholder="Split Node"
             :fetch-suggestions="angleSuggestions"
+            @select="() => emit('command', 'J')"
             :trigger-on-focus="true"
             clearable
             hide-loading
-            class="inline-input"
+            :class="{
+              'inline-input': true,
+              'disable-btn': !props.checkCanDoCommand.J.value,
+            }"
           >
             <template #append>
               <ElTooltip

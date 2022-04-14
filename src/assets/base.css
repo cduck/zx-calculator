@@ -34,3 +34,70 @@ body {
   border-width: 2px;
   padding: 0px;
 }
+
+/* Element Plus button in text input style improvement */
+.el-input__inner::placeholder,
+.disable-btn .el-input__inner::placeholder {
+  color: #606266;
+}
+.el-input__inner,
+.disable-btn .el-input__inner:focus {
+  color: #606266;
+}
+.disable-btn .el-input__inner {
+  color: #a8abb2;
+}
+.el-input-group__append {
+  background-color: #fff; /*var(--el-button-bg-color)*/
+  box-shadow: 0 1px 0 0 #dcdfe6 inset,0 -1px 0 0 #dcdfe6 inset,-1px 0 0 0 #dcdfe6 inset;
+}
+.disable-btn .el-input-group__append {
+  background-color: #fff; /*var(--el-button-disabled-bg-color)*/
+  box-shadow: 0 1px 0 0 #e4e7ed inset,0 -1px 0 0 #e4e7ed inset,-1px 0 0 0 #e4e7ed inset;
+}
+.el-input__inner {
+  box-shadow: 0 0 0 1px #dcdfe6 inset;
+}
+.disable-btn .el-input__inner {
+  box-shadow: 0 0 0 1px #e4e7ed inset;
+}
+.disable-btn .el-input__inner:hover,
+.el-input__inner:hover {
+  box-shadow: 0 0 0 1px #c0c4cc inset;
+}
+.disable-btn .el-input__inner:focus,
+.el-input__inner:focus {
+  box-shadow: 0 0 0 1px #409eff inset;
+}
+.el-input-group__append > button.el-button {
+  color: #606266; /*var(--el-button-text-color)*/
+  border: 1px solid transparent;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -21px;
+}
+.el-input-group__append > button.el-button:hover,
+.el-input-group__append > button.el-button:focus {
+  color: #409eff;
+  border-color: #c6e2ff;
+  background-color: #ecf5ff;
+  /*color: var(--el-button-hover-text-color);
+  border-color: var(--el-button-hover-border-color);
+  background-color: var(--el-button-hover-bg-color);*/
+}
+.el-input-group__append > button.el-button:active {
+  color: #409eff;
+  border-color: #409eff;
+  background-color: #ecf5ff;
+  /*color: var(--el-button-active-text-color);
+  border-color: var(--el-button-active-border-color);
+  background-color: var(--el-button-active-bg-color);*/
+}
+.disable-btn .el-input-group__append > button.el-button,
+.disable-btn .el-input-group__append > button.el-button:hover,
+.disable-btn .el-input-group__append > button.el-button:focus,
+.disable-btn .el-input-group__append > button.el-button:active {
+  color: #a8abb2; /*var(--el-button-disabled-text-color)*/
+  border-color: transparent;
+  background-color: transparent;
+}
