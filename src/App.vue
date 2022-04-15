@@ -33,13 +33,7 @@ const undoStore = reactive(
     maxHistory: 0,
     linkToBrowser: true,
     serialize: serialize,
-    deserialize: (str) => {
-      try {
-        return deserialize(str);
-      } catch (e) {
-        console.error("Graph parse from URL failed:", e.message || e);
-      }
-    },
+    deserialize: deserialize,
     title: (data, name, inHistory) =>
       "ZX Calculator — " +
       (inHistory ? `${graphSummary(data)}, ${name}` : graphSummary(data)),
@@ -119,7 +113,7 @@ onMounted(() => {
   styleStore.graph.svg.addEventListener("drop", pasteOrDropHandler);
   undoStore.load();
   if (undoStore.isEmpty()) {
-    undoStore.addEntry(makeFullGraphStateCopy(), "init", true);
+    undoStore.insertEntry(makeFullGraphStateCopy(), "init");
   }
   wereNodesMoved.value = false;
 });

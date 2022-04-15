@@ -22,11 +22,13 @@ export class UndoHistory {
   }
 
   load() {
-    if (this.linkToBrowser && !this.popStateHandler) {
-      this.popStateHandler = (e) => this._onPopState(e);
-      window.addEventListener("popstate", this.popStateHandler);
+    if (this.linkToBrowser) {
+      if (!this.popStateHandler) {
+        this.popStateHandler = (e) => this._onPopState(e);
+        window.addEventListener("popstate", this.popStateHandler);
+      }
+      this._loadCurrentUrl(true);
     }
-    this._loadCurrentUrl(true);
   }
 
   unload() {
@@ -77,31 +79,45 @@ export class UndoHistory {
     if (typeof time !== "number") {
       time = undefined;
     }
-    //const unique = fingerprint ? fingerprint.split("-", 1)[0] : undefined;
     let found = false;
     if (fingerprint) {
-      for (let i = 0; i < this.history.length; i++) {
-        if (this.history[i].fingerprint === fingerprint) {
-          found = true;
-          this.currentIndex = i;
-        } else if (found) {
-          if (!this.history[i].browser && !this.goingForward) {
+      if (this.goingForward) {
+        for (let i = 0; i < this.history.length; i++) {
+          if (this.history[i].fingerprint === fingerprint) {
+            found = true;
             this.currentIndex = i;
-          } else {
+            break;
+          }
+        }
+      } else {
+        for (let i = this.history.length - 1; i >= 0; i--) {
+          if (this.history[i].fingerprint === fingerprint) {
+            found = true;
+            this.currentIndex = i;
             break;
           }
         }
       }
-      if (found) {
-        // This is in known history, go there
-        delete this.outOfHistory;
-        if (this.browserNavigateCallback) {
-          // Call before updating currentIndex
-          this.browserNavigateCallback(this.history[this.currentIndex].data);
-        }
-      }
     }
-    if (!found) {
+    if (found) {
+      // This is in known history, go there
+      delete this.outOfHistory;
+      if (this.browserNavigateCallback) {
+        this.browserNavigateCallback(this.history[this.currentIndex].data);
+      }
+      if (
+        this.currentIndex < this.history.length - 1 &&
+        this.history[this.currentIndex + 1].fingerprint === fingerprint
+      ) {
+        // Update URL for this precise position
+        this._pushBrowserHistory(
+          this.history[this.currentIndex].data,
+          this.history[this.currentIndex].name,
+          fingerprint,
+          true
+        );
+      }
+    } else {
       this._loadCurrentUrl();
     }
     this.goingForward = false;
@@ -117,7 +133,7 @@ export class UndoHistory {
     try {
       data = this.deserialize ? this.deserialize(serial) : JSON.parse(serial);
     } catch (e) {
-      console.error("Error during URL fragment deserialzation:", e);
+      console.error("Graph parse from URL failed:", e.message || e);
       return;
     }
     this.browserNavigateCallback(data);
@@ -145,23 +161,15 @@ export class UndoHistory {
             title,
             this._urlFragment(data)
           );
-          for (let i = this.currentIndex; i >= 0; i--) {
-            if (this.history[i].browser) {
-              // This entry is not longer in browser history, replaced by data
-              delete this.history[i].browser;
-              break;
-            }
-          }
         } else {
           window.history.pushState({ id: id }, title, this._urlFragment(data));
         }
-        this.history[this.currentIndex].browser = true;
       }
       document.title = title;
     }
   }
 
-  addEntry(dataCopy, name, repBrowserHistory, noModHistory) {
+  addEntry(dataCopy, name) {
     if (this.outOfHistory) {
       const oldData = this.outOfHistory;
       delete this.outOfHistory;
@@ -169,8 +177,8 @@ export class UndoHistory {
       this.currentIndex = -1;
       this.addEntry(oldData, "url", true, false);
     }
-    this.history.splice(this.currentIndex + 1); // Remove all redo entries
     const fingerprint = this._nextFingerprint();
+    this.history.splice(this.currentIndex + 1); // Remove all redo entries
     this.history.push({
       data: dataCopy,
       name: name,
@@ -178,13 +186,7 @@ export class UndoHistory {
     });
     this.currentIndex = this.history.length - 1;
     this._trimToMaxLength();
-    this._pushBrowserHistory(
-      dataCopy,
-      name,
-      fingerprint,
-      repBrowserHistory,
-      noModHistory
-    );
+    this._pushBrowserHistory(dataCopy, name, fingerprint);
   }
 
   updateEntry(dataCopy, name) {
@@ -193,7 +195,8 @@ export class UndoHistory {
       fingerprint = this._nextFingerprint();
       this.outOfHistory = dataCopy;
     } else {
-      fingerprint = this.history[this.currentIndex].fingerprint;
+      fingerprint =
+        this.history[this.currentIndex]?.fingerprint ?? this._nextFingerprint();
       this.history[this.currentIndex] = {
         data: dataCopy,
         name: name,
@@ -212,7 +215,8 @@ export class UndoHistory {
       this.currentIndex = -1;
       this.addEntry(oldData, "url", true, false);
     }
-    const fingerprint = this._nextFingerprint();
+    const fingerprint =
+      this.history[this.currentIndex]?.fingerprint ?? this._nextFingerprint();
     this.history.splice(this.currentIndex + 1 + (offset || 0), 0, {
       data: dataCopy,
       name: name,
@@ -230,14 +234,24 @@ export class UndoHistory {
     if (this.currentIndex <= 0) {
       return undefined;
     }
-    if (this.linkToBrowser && this.history[this.currentIndex].browser) {
-      this.currentIndex -= 1;
+    this.currentIndex -= 1;
+    const currentH = this.history[this.currentIndex];
+    if (
+      this.linkToBrowser &&
+      currentH.fingerprint !== this.history[this.currentIndex + 1].fingerprint
+    ) {
       this.goingForward = false;
       window.history.back();
       return undefined; // The back action will trigger a callback
+    } else {
+      this._pushBrowserHistory(
+        currentH.data,
+        currentH.name,
+        currentH.fingerprint,
+        true
+      );
+      return this.history[this.currentIndex].data;
     }
-    this.currentIndex -= 1;
-    return this.history[this.currentIndex].data;
   }
 
   redo() {
@@ -246,12 +260,23 @@ export class UndoHistory {
       return undefined;
     }
     this.currentIndex += 1;
-    if (this.linkToBrowser && this.history[this.currentIndex].browser) {
+    const currentH = this.history[this.currentIndex];
+    if (
+      this.linkToBrowser &&
+      this.history[this.currentIndex - 1].fingerprint !== currentH.fingerprint
+    ) {
       this.goingForward = true;
       window.history.forward(); // The forward action will trigger a callback
-      return;
+      return undefined;
+    } else {
+      this._pushBrowserHistory(
+        currentH.data,
+        currentH.name,
+        currentH.fingerprint,
+        true
+      );
+      return this.history[this.currentIndex].data;
     }
-    return this.history[this.currentIndex].data;
   }
 
   peek(offset) {
