@@ -1,8 +1,10 @@
 <script setup>
 import {
   ref,
+  toRef,
   computed,
   reactive,
+  watch,
   onMounted,
   onBeforeMount,
   onBeforeUnmount,
@@ -50,21 +52,34 @@ const panstart = () => {
 const panstop = () => {
   overlayInactive.value = false;
 };
+const resetView = () => {
+  const numNodes = Object.keys(gops.graph.nodes).length;
+  if (numNodes <= 0) {
+    styleStore.extra.zoomLevel = 1;
+    const { width, height } = styleStore.graph.svgPanZoom.getSizes();
+    styleStore.graph.panTo({ x: width / 2, y: height / 2 });
+  } else {
+    styleStore.extra.zoomLevel = 1;
+    styleStore.graph?.panToCenter();
+  }
+};
 const zoomToFit = (maxZoom) => {
-  styleStore.graph.svgPanZoom.updateBBox();
-  if (Object.keys(gops.graph.nodes).length <= 1) {
-    const { realZoom } = styleStore.graph.svgPanZoom.getSizes();
-    styleStore.graph.svgPanZoom.zoomBy(1 / realZoom).center();
+  const numNodes = Object.keys(gops.graph.nodes).length;
+  if (numNodes <= 0) {
+    resetView();
     return;
   }
   const panelWidth = 200;
   const { width } = styleStore.graph.svgPanZoom.getSizes();
   let zoom =
     width < 4 * panelWidth ? 1 / 1.1 : (width - 2 * panelWidth) / width;
-  styleStore.graph.svgPanZoom.fit().center().zoomBy(zoom);
+  styleStore.graph.svgPanZoom
+    .fit()
+    .zoomBy(zoom || 1 / 1.1)
+    .center();
   const { realZoom } = styleStore.graph.svgPanZoom.getSizes();
   if (maxZoom && realZoom > maxZoom) {
-    styleStore.graph.svgPanZoom.zoomBy(maxZoom / realZoom);
+    styleStore.graph.svgPanZoom.zoomBy(maxZoom / realZoom || 1);
   }
 };
 
@@ -240,14 +255,22 @@ const graphStateRedo = () => {
     wereNodesMoved.value = false;
   }
 };
-const nodeMove = () => {
-  overlayInactive.value = false;
+const updateNodesMaybeMoved = () => {
   if (wereNodesMoved.value) {
     undoStore.updateEntry(makeFullGraphStateCopy(), "move nodes");
   } else {
     undoStore.insertEntry(makeFullGraphStateCopy(), "move nodes");
   }
   wereNodesMoved.value = true;
+};
+watch(toRef(styleStore.layout, "forceLayout"), (newForce) => {
+  if (!newForce) {
+    updateNodesMaybeMoved();
+  }
+});
+const nodeMove = () => {
+  overlayInactive.value = false;
+  updateNodesMaybeMoved();
 };
 const nodeMoveStart = () => {
   overlayInactive.value = true;
@@ -263,7 +286,6 @@ const recordAfterGraphMod = (name) => {
   wereNodesMoved.value = false;
 };
 const edgeMultiClick = (detail) => {
-  console.log("click");
   const e = detail.event;
   if (detail.count === 1) {
     if (e?.shiftKey || e?.metaKey || e?.shiftKey) {
@@ -579,11 +601,9 @@ const command = (code) => {
       case "fitView":
         zoomToFit();
         break;
-      case "resetView": {
-        const { realZoom } = styleStore.graph.svgPanZoom.getSizes();
-        styleStore.graph.svgPanZoom.zoomBy(1 / realZoom).center();
+      case "resetView":
+        resetView();
         break;
-      }
       case "Escape":
         // Clear selection
         selectedEdges.value = [];
@@ -885,11 +905,13 @@ const importPyzx = (str) => {
 
 const pyzxJsonStr = ref("");
 const exportPyzx = () => {
+  updateNodesMaybeMoved();
   pyzxJsonStr.value = toPyzxJson(graphStore, styleStore.layout.distance);
 };
 
 const svgOutStrGet = () => {
   // Get the permalink
+  updateNodesMaybeMoved();
   const permalink =
     location.href.split("#", 1)[0] + undoStore._urlFragment(graphStore);
   // Get SVG content
