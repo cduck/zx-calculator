@@ -4,7 +4,6 @@ import { defineStore } from "pinia";
 export const usePanelStore = defineStore("panel", {
   state: () => ({
     rewriteMode: false,
-    selectMode: "",
     angleToSet: "",
     angleToAdd: "",
     angleToSplit: "",

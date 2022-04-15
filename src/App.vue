@@ -85,6 +85,8 @@ const zoomToFit = (maxZoom) => {
 
 // Life cycle listeners
 onBeforeMount(() => {
+  loadConfig();
+  watchConfig();
   window.addEventListener("keydown", keydown);
 });
 onBeforeUnmount(() => {
@@ -98,6 +100,58 @@ onMounted(() => {
   }
   wereNodesMoved.value = false;
 });
+
+// Save some configuration
+const watchConfig = () => {
+  watch(toRef(panelStore, "rewriteMode"), saveConfig);
+  watch(toRef(styleStore.view.grid, "visible"), saveConfig);
+  watch(toRef(styleStore.view, "scalingObjects"), saveConfig);
+  watch(styleStore.layout, saveConfig);
+};
+const saveConfig = () => {
+  const config = {
+    rewriteMode: panelStore.rewriteMode,
+    gridVisible: styleStore.view.grid.visible,
+    snapToGrid: styleStore.layout.snapToGrid,
+    scaleNodes: styleStore.view.scalingObjects,
+    forceLayout: styleStore.layout.forceLayout,
+    fixBoundaries: styleStore.layout.fixBoundaries,
+  };
+  console.log("save", config);
+  try {
+    window.localStorage.setItem("zx-view-config", JSON.stringify(config));
+  } catch (e) {
+    console.warn("failed to save config:", e);
+  }
+};
+const loadConfig = () => {
+  let config;
+  try {
+    config = window.localStorage.getItem("zx-view-config");
+    if (config) {
+      config = JSON.parse(config);
+    }
+  } catch (e) {
+    console.warn("failed to load config:", e);
+  }
+  console.log("load", config);
+  if (!config || typeof config !== "object") return;
+  let {
+    rewriteMode,
+    gridVisible,
+    snapToGrid,
+    scaleNodes,
+    //forceLayout, // Don't load this setting because it changes node layouts
+    fixBoundaries,
+  } = config;
+  panelStore.rewriteMode = rewriteMode ?? panelStore.rewriteMode;
+  styleStore.view.grid.visible = gridVisible ?? styleStore.view.grid.visible;
+  styleStore.layout.snapToGrid = snapToGrid ?? styleStore.layout.snapToGrid;
+  styleStore.view.scalingObjects = scaleNodes ?? styleStore.view.scalingObjects;
+  //styleStore.layout.forceLayout = forceLayout ?? styleStore.layout.forceLayout;
+  styleStore.layout.fixBoundaries =
+    fixBoundaries ?? styleStore.layout.fixBoundaries;
+};
 
 // Catch key strokes
 const keydown = (e) => {
