@@ -135,6 +135,74 @@ export class ConfigurableLayout {
     );
   }
 
+  findBestNodePositions(nodeIds, forceGrid, allowOffPage) {
+    const { layouts, nodes, configs, scale, svgPanZoom } = this.getParameters();
+    const area = svgPanZoom.getViewArea();
+    const s = scale.value;
+    const dist = this.options.grid;
+    const forceDist = forceGrid ? dist : undefined;
+    const withNoInitPos = [];
+    for (const nodeId of nodeIds) {
+      if (!layouts[nodeId]?.x || !layouts[nodeId]?.y) {
+        withNoInitPos.push(nodeId);
+        continue;
+      }
+      const node = nodes.value[nodeId];
+      const nodeSize = getNodeSize(node, configs.node, s);
+      const start = this.snapPosition(layouts[nodeId], forceDist);
+      if (!allowOffPage) {
+        if (start.x - nodeSize.width / 2 < area.box.left) {
+          start.x = area.box.left + nodeSize.width / 2;
+          this.snapPosition(start, forceDist);
+          start.x += dist;
+        } else if (start.x + nodeSize.width / 2 > area.box.right) {
+          start.x = area.box.right - nodeSize.width / 2;
+          this.snapPosition(start, forceDist);
+          start.x -= dist;
+        }
+        if (start.y - nodeSize.height / 2 < area.box.top) {
+          start.y = area.box.top + nodeSize.height / 2;
+          this.snapPosition(start, forceDist);
+          start.y += dist;
+        } else if (start.y + nodeSize.height / 2 > area.box.bottom) {
+          start.y = area.box.bottom - nodeSize.height / 2;
+          this.snapPosition(start, forceDist);
+          start.y -= dist;
+        }
+      }
+      const candidate = { ...start };
+      findPos: for (;;) {
+        let collision = false;
+        collide: for (const [id, pos] of Object.entries(layouts)) {
+          if (nodeId === id) continue;
+          const targetNode = nodes.value[id];
+          if (!targetNode) continue;
+          if (
+            Math.abs(pos.x - candidate.x) < dist &&
+            Math.abs(pos.y - candidate.y) < dist
+          ) {
+            collision = true;
+            break collide;
+          }
+        }
+        if (collision) {
+          candidate.x += dist;
+          if (!allowOffPage) {
+            if (candidate.x + nodeSize.width / 2 > area.box.right) {
+              candidate.x = start.x;
+              candidate.y += dist;
+            }
+          }
+        } else {
+          break findPos;
+        }
+      }
+      const layout = this.getOrCreateNodePosition(layouts, nodeId);
+      this.setNodePosition(layout, candidate);
+    }
+    this.setNewNodePositions(withNoInitPos);
+  }
+
   setNewNodePositions(nodeIds) {
     const { layouts, nodes, configs, scale, svgPanZoom } = this.getParameters();
     // Set the positions of newly added nodes
@@ -142,12 +210,17 @@ export class ConfigurableLayout {
     const s = scale.value;
     const dist = this.options.newNodePositionMargin || this.options.distance;
     for (const nodeId of nodeIds) {
-      if (nodeId in layouts) continue;
+      if (
+        layouts[nodeId]?.x !== undefined &&
+        layouts[nodeId]?.y !== undefined
+      ) {
+        continue;
+      }
       // New node
       const node = nodes.value[nodeId];
       const nodeSize = getNodeSize(node, configs.node, s);
       const candidate = this.snapPosition({ ...area.center }, dist);
-      find_pos: for (;;) {
+      findPos: for (;;) {
         let collision = false;
         collide: for (const [id, pos] of Object.entries(layouts)) {
           if (nodeId === id) continue;
@@ -164,11 +237,11 @@ export class ConfigurableLayout {
           this.snapPosition(candidate, dist);
           if (candidate.x + nodeSize.width / 2 > area.box.right) {
             candidate.x = area.center.x;
-            candidate.y += this.options.DEFAULT_OPTIONS;
+            candidate.y += dist;
             this.snapPosition(candidate, dist);
           }
         } else {
-          break find_pos;
+          break findPos;
         }
       }
       const layout = this.getOrCreateNodePosition(layouts, nodeId);

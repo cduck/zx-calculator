@@ -44,19 +44,20 @@ const oneAsEmpty = (v) => (v === 1 ? "" : v);
 
 const splitNoEmpty = (str, div) => (str ? str.split(div) : []);
 
-export const serialize = (data) => {
-  const nodeEntries = Object.entries(data.nodes);
+export const serialize = (data, subgraphNodes) => {
   if (!data || !data.nodes) {
     return "";
   }
-  let minX = nodeEntries.length > 0 ? Infinity : 0;
+  const nodes = subgraphNodes ?? Object.keys(data.nodes);
+  let minX = nodes.length > 0 ? Infinity : 0;
   let minY = minX;
   const scaleX = 1;
   const scaleY = 1;
   const defaultLoc = { x: 0, y: 0 };
   // Organize nodes by type and angle
   const nodesByTypeThenAngle = {};
-  for (const [n, p] of nodeEntries) {
+  for (const n of nodes) {
+    const p = data.nodes[n];
     const byAngle = nodesByTypeThenAngle[p.zxType] ?? {};
     nodesByTypeThenAngle[p.zxType] = byAngle;
     const a = p.zxAngle === "0" ? "" : p.zxAngle || "";
@@ -143,6 +144,7 @@ export const serialize = (data) => {
   // Organize edges
   const edges = {};
   for (const [e, p] of Object.entries(data.edges)) {
+    if (!(p.source in nodeIMap) || !(p.target in nodeIMap)) continue;
     let zxAbbr = VALID_EDGE_ZX_TYPE[p.zxType];
     assert(
       zxAbbr && typeof zxAbbr === "string" && zxAbbr.length === 1,
@@ -195,11 +197,13 @@ export const serialize = (data) => {
   const edgesStr = edgesStrArr.join(",");
   // Organize paths
   const paths = {};
-  for (const [p, { edges: es }] of Object.entries(data.paths)) {
-    paths[p] = [];
+  outer: for (const [p, { edges: es }] of Object.entries(data.paths)) {
+    const l = [];
     for (const e of es) {
-      paths[p].push(edgeIMap[e]);
+      if (!(e in edgeIMap)) break outer;
+      l.push(edgeIMap[e]);
     }
+    paths[p] = l;
   }
   const sortedPaths = Object.entries(paths).sort(([p1, es1], [p2, es2]) => {
     for (let i = 0; i < es1.length && i < es2.length; i++) {
@@ -235,19 +239,31 @@ export const serialize = (data) => {
   const version = "0";
   const flags = "";
   if (version === "0" && !flags) {
-    return graphStr;
+    return `{${graphStr}}`;
   }
-  return `${version}${flags}:${graphStr}`;
+  return `{${version}${flags}:${graphStr}}`;
 };
 
-export const deserialize = (str) => {
+export const deserialize = (str, idPrefix, offsetX, offsetY) => {
+  idPrefix = idPrefix ?? "";
+  offsetX = offsetX ?? 0;
+  offsetY = offsetY ?? 0;
   if (!str || typeof str !== "string" || str.length <= 0) {
     return undefined;
   }
+  const bracketI = str.indexOf("{");
+  if (bracketI >= 0) {
+    const endI = str.indexOf("}");
+    if (endI >= 0 && bracketI < endI) {
+      str = str.slice(bracketI + 1, endI);
+    } else {
+      throw new GraphSerializeException("unmatched curly bracket");
+    }
+  }
   const mainComponents = str.split(":");
   if (mainComponents.length > 1 && mainComponents[0] !== "0") {
-    throw GraphSerializeException(
-      `Unknown version "${mainComponents[0].slice(0, 10)}"`
+    throw new GraphSerializeException(
+      `unknown version "${mainComponents[0].slice(0, 10)}"`
     );
   }
   // Parsing version "0"
@@ -302,10 +318,13 @@ export const deserialize = (str) => {
       const isPlus = entry.slice(0, 1) === "+";
       if (gotX) {
         prevY = isPlus ? minY + num : prevY + num;
-        const nid = `n${nodeI}`;
+        const nid = `${idPrefix}n${nodeI}`;
         nodes[nid] = { zxType: nodeType };
         if (nodeAngle) nodes[nid].zxAngle = nodeAngle;
-        locations[nid] = { x: prevX / scaleX, y: prevY / scaleY };
+        locations[nid] = {
+          x: offsetX + prevX / scaleX,
+          y: offsetY + prevY / scaleY,
+        };
         gotX = false;
         nodeI += 1;
       } else {
@@ -352,9 +371,9 @@ export const deserialize = (str) => {
             if (prevSource >= nodeI || prevTarget >= nodeI) {
               console.warn(`edge between non-existant nodes "${group}"`);
             } else {
-              edges[`e${edgeI}`] = {
-                source: `n${prevSource}`,
-                target: `n${prevTarget}`,
+              edges[`${idPrefix}e${edgeI}`] = {
+                source: `${idPrefix}n${prevSource}`,
+                target: `${idPrefix}n${prevTarget}`,
                 zxType: edgeType,
               };
               edgeI += 1;
@@ -383,10 +402,10 @@ export const deserialize = (str) => {
           console.warn(`non-integer edge id in path "${entry}"`);
         } else {
           prevEdge = isPlus ? num : prevEdge + num;
-          edges.push(`e${prevEdge}`);
+          edges.push(`${idPrefix}e${prevEdge}`);
         }
       }
-      paths[`p${pathI}`] = { edges: edges };
+      paths[`${idPrefix}p${pathI}`] = { edges: edges };
       pathI += 1;
     }
   }

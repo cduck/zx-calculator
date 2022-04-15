@@ -38,7 +38,8 @@ body {
 /* Element Plus button in text input style improvement */
 .el-input__inner::placeholder,
 .disable-btn .el-input__inner::placeholder {
-  color: #606266;
+  color: #a8abb2;
+  opacity: 1;
 }
 .el-input__inner,
 .disable-btn .el-input__inner:focus {

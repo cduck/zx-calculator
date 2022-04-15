@@ -25,7 +25,7 @@ const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 const graphStore = useGraphStore();
 const gops = new GraphOps(graphStore, (ns) =>
-  styleStore.view.layoutHandler.setNewNodePositions(ns)
+  styleStore.view.layoutHandler.findBestNodePositions(ns)
 );
 const grewrite = new GraphRewrite(gops);
 const undoStore = reactive(
@@ -33,7 +33,13 @@ const undoStore = reactive(
     maxHistory: 0,
     linkToBrowser: true,
     serialize: serialize,
-    deserialize: deserialize,
+    deserialize: (str) => {
+      try {
+        return deserialize(str);
+      } catch (e) {
+        console.error("Graph parse from URL failed:", e.message || e);
+      }
+    },
     title: (data, name, inHistory) =>
       "ZX Calculator — " +
       (inHistory ? `${graphSummary(data)}, ${name}` : graphSummary(data)),
@@ -43,6 +49,8 @@ const undoStore = reactive(
 const selectedNodes = ref([]);
 const selectedEdges = ref([]);
 const markedNodes = ref({ a: [], b: [] });
+
+const modalVisible = ref(false);
 
 // Disable overlay panels while panning
 const overlayInactive = ref(false);
@@ -60,7 +68,7 @@ const resetView = () => {
     styleStore.graph.panTo({ x: width / 2, y: height / 2 });
   } else {
     styleStore.extra.zoomLevel = 1;
-    styleStore.graph?.panToCenter();
+    styleStore.graph.panToCenter();
   }
 };
 const zoomToFit = (maxZoom) => {
@@ -69,6 +77,7 @@ const zoomToFit = (maxZoom) => {
     resetView();
     return;
   }
+  styleStore.graph.panToCenter();
   const panelWidth = 200;
   const { width } = styleStore.graph.svgPanZoom.getSizes();
   let zoom =
@@ -88,12 +97,26 @@ onBeforeMount(() => {
   loadConfig();
   watchConfig();
   window.addEventListener("keydown", keydown);
+  document.addEventListener("paste", pasteOrDropHandler);
+  document.addEventListener("copy", copyOrCutHandler);
+  document.addEventListener("cut", copyOrCutHandler);
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", keydown);
+  styleStore.graph.svg.removeEventListener("dragenter", dragEnterHandler);
+  styleStore.graph.svg.removeEventListener("dragover", dragOverHandler);
+  styleStore.graph.svg.removeEventListener("dragleave", dragLeaveHandler);
+  styleStore.graph.svg.removeEventListener("drop", pasteOrDropHandler);
+  document.removeEventListener("paste", pasteOrDropHandler);
+  document.removeEventListener("copy", copyOrCutHandler);
+  document.removeEventListener("cut", copyOrCutHandler);
   undoStore.unload();
 });
 onMounted(() => {
+  styleStore.graph.svg.addEventListener("dragenter", dragEnterHandler);
+  styleStore.graph.svg.addEventListener("dragover", dragOverHandler);
+  styleStore.graph.svg.addEventListener("dragleave", dragLeaveHandler);
+  styleStore.graph.svg.addEventListener("drop", pasteOrDropHandler);
   undoStore.load();
   if (undoStore.isEmpty()) {
     undoStore.addEntry(makeFullGraphStateCopy(), "init", true);
@@ -117,7 +140,6 @@ const saveConfig = () => {
     forceLayout: styleStore.layout.forceLayout,
     fixBoundaries: styleStore.layout.fixBoundaries,
   };
-  console.log("save", config);
   try {
     window.localStorage.setItem("zx-view-config", JSON.stringify(config));
   } catch (e) {
@@ -134,7 +156,6 @@ const loadConfig = () => {
   } catch (e) {
     console.warn("failed to load config:", e);
   }
-  console.log("load", config);
   if (!config || typeof config !== "object") return;
   let {
     rewriteMode,
@@ -169,19 +190,28 @@ const keydown = (e) => {
       : e.shiftKey
       ? String.fromCharCode(code).toUpperCase()
       : String.fromCharCode(code).toLowerCase();
-  if (!e.altKey && !e.ctrlKey && !e.metaKey) {
-    // Allow backspace or 'x'
-    if (k === "Backspace") {
-      k = e.shiftKey ? "X" : "x";
+  if (modalVisible.value) {
+    if (k === "Escape") {
+      // Press escape to close the modal view
+      modalVisible.value = false;
+      used = true;
     }
-    used = command(k);
-  } else if (e.metaKey ^ e.ctrlKey) {
-    if (k === "z" && !e.shiftKey) {
-      used = command("Undo");
-    } else if ((k === "Z" && e.shiftKey) || (k === "y" && !e.shiftKey)) {
-      used = command("Redo");
-    } else if (k === "a" && !e.shiftKey) {
-      used = command("selectAll");
+    // Don't run commands when a modal view is covering the graph
+  } else {
+    if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+      // Allow backspace or 'x'
+      if (k === "Backspace") {
+        k = e.shiftKey ? "X" : "x";
+      }
+      used = command(k);
+    } else if (e.metaKey ^ e.ctrlKey) {
+      if (k === "z" && !e.shiftKey) {
+        used = command("Undo");
+      } else if ((k === "Z" && e.shiftKey) || (k === "y" && !e.shiftKey)) {
+        used = command("Redo");
+      } else if (k === "a" && !e.shiftKey) {
+        used = command("selectAll");
+      }
     }
   }
   if (used) {
@@ -189,12 +219,168 @@ const keydown = (e) => {
     e.stopPropagation();
   }
 };
+const dragOverlayVisible = ref(false);
+const dragEnterHandler = (e) => {
+  if (
+    e.target instanceof HTMLInputElement ||
+    e.target instanceof HTMLTextAreaElement ||
+    modalVisible.value
+  ) {
+    return;
+  }
+  e.dataTransfer.effectAllowed = "copy";
+  dragOverlayVisible.value = true;
+  e.preventDefault();
+  e.stopPropagation();
+};
+const dragOverHandler = (e) => {
+  if (
+    e.target instanceof HTMLInputElement ||
+    e.target instanceof HTMLTextAreaElement ||
+    modalVisible.value
+  ) {
+    return;
+  }
+  dragOverlayVisible.value = true;
+  e.preventDefault();
+  e.stopPropagation();
+};
+const dragLeaveHandler = (e) => {
+  if (
+    e.target instanceof HTMLInputElement ||
+    e.target instanceof HTMLTextAreaElement ||
+    modalVisible.value
+  ) {
+    return;
+  }
+  dragOverlayVisible.value = false;
+  e.preventDefault();
+  e.stopPropagation();
+};
+const pasteOrDropHandler = (e) => {
+  if (
+    e.target instanceof HTMLInputElement ||
+    e.target instanceof HTMLTextAreaElement ||
+    modalVisible.value
+  ) {
+    return;
+  }
+  dragOverlayVisible.value = false;
+  const dataTransfer = e.clipboardData || e.dataTransfer;
+  pasteDataTransfer(dataTransfer);
+  e.preventDefault();
+  e.stopPropagation();
+};
+const pasteDataTransfer = (dataTransfer) => {
+  let gotContent = false;
+  const pasteFile = (file) => {
+    file.text().then(
+      (str) => {
+        paste(str);
+      },
+      (e) => {
+        console.warn("failed to read pasted or dropped file:", e);
+      }
+    );
+  };
+  for (const file of dataTransfer.files) {
+    pasteFile(file);
+    gotContent = true;
+    break; // Ignore any other files
+  }
+  if (!gotContent) {
+    for (const item of dataTransfer.items) {
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) {
+          pasteFile(file);
+          gotContent = true;
+          break;
+        }
+      } else if (item.type.match(/^text\/uri-list(\+|$)/)) {
+        // Content is (multiple) URLs with #comments
+        item.getAsString((uris) => {
+          for (let uri of uris.split("\n")) {
+            uri = uri.trim();
+            if (uri.slice(0, 1) === "#") continue;
+            paste(uri);
+            break;
+          }
+        });
+        gotContent = true;
+        break;
+      } else if (item.type.match(/^text\/html(\+|$)/)) {
+        // Content is an HTML link
+        item.getAsString((html) => {
+          // Extract link from the first anchor in the HTML
+          const htmlTag = new DOMParser().parseFromString(html, "text/html");
+          const href = htmlTag.querySelector("a")?.href;
+          if (href) {
+            paste(href);
+          } else {
+            paste(htmlTag.innerText);
+          }
+        });
+        gotContent = true;
+        break;
+      } else if (item.type.match(/^(text\/plain|application\/json)(\+|$)/)) {
+        // Content is plain text
+        item.getAsString((text) => {
+          paste(text);
+        });
+        gotContent = true;
+        break;
+      } else {
+        // Unknown, skip
+      }
+    }
+  }
+};
+const copyOrCutHandler = (e) => {
+  if (
+    e.target instanceof HTMLInputElement ||
+    e.target instanceof HTMLTextAreaElement ||
+    modalVisible.value
+  ) {
+    return;
+  }
+  if (panelStore.rewriteMode && e.type === "cut") {
+    // Don't cut in rewrite mode
+    return;
+  }
+  if (selectedNodes.value.length <= 0) {
+    // No nodes to copy
+    return;
+  }
+  const dataTransfer = e.clipboardData || e.dataTransfer;
+  let copyData;
+  if (e.type === "cut") {
+    recordBeforeGraphMod();
+    copyData = cut(selectedNodes.value);
+    recordAfterGraphMod("edit:cut");
+  } else {
+    copyData = copy(selectedNodes.value);
+  }
+  const { str, title } = copyData;
+  const strWithComment = `#${title}\n${str}`;
+  const aTag = document.createElement("a");
+  aTag.href = str;
+  aTag.innerText = title;
+  const strWithHtml = aTag.outerHTML;
+  dataTransfer.items.add(strWithComment, "text/uri-list");
+  dataTransfer.items.add(strWithHtml, "text/html");
+  dataTransfer.items.add(str, "text/plain");
+  e.preventDefault();
+  e.stopPropagation();
+};
 
 // Undo/redo logic, accounting for nodes moved between edits
 const graphSummary = (data) => {
-  const numNodes = Object.keys(data.nodes).length;
-  const numEdges = Object.keys(data.edges).length;
-  return `${numNodes} nodes, ${numEdges} edges`;
+  const numNodes = Object.keys(data?.nodes || {}).length;
+  const numEdges = Object.keys(data?.edges || {}).length;
+  return `${numNodes} node${numNodes === 1 ? "" : "s"}, ${numEdges} edge${
+    numEdges === 1 ? "" : "s"
+  }`;
 };
 const makeFullGraphStateCopy = (recordMode) => {
   const data = graphStore.fullCopy();
@@ -211,18 +397,18 @@ const graphStateFullReplace = (data) => {
   selectedEdges.value = [];
   graphStore.fullReplace(data);
   styleStore.view.layoutHandler.networkChanged();
-  selectedNodes.value = (data.selectedNodes ?? []).filter(
+  selectedNodes.value = (data?.selectedNodes ?? []).filter(
     (n) => graphStore.nodes[n]
   );
-  selectedEdges.value = (data.selectedEdges ?? []).filter(
+  selectedEdges.value = (data?.selectedEdges ?? []).filter(
     (e) => graphStore.edges[e]
   );
   window.setTimeout(() => {
     // Hack fix
-    selectedNodes.value = (data.selectedNodes ?? []).filter(
+    selectedNodes.value = (data?.selectedNodes ?? []).filter(
       (n) => graphStore.nodes[n]
     );
-    selectedEdges.value = (data.selectedEdges ?? []).filter(
+    selectedEdges.value = (data?.selectedEdges ?? []).filter(
       (e) => graphStore.edges[e]
     );
   }, 0);
@@ -325,6 +511,7 @@ watch(toRef(styleStore.layout, "forceLayout"), (newForce) => {
 const nodeMove = () => {
   overlayInactive.value = false;
   updateNodesMaybeMoved();
+  delete paste.pasteContent;
 };
 const nodeMoveStart = () => {
   overlayInactive.value = true;
@@ -340,10 +527,10 @@ const recordAfterGraphMod = (name) => {
   wereNodesMoved.value = false;
 };
 const edgeMultiClick = (detail) => {
+  document.activeElement.blur();
   const e = detail.event;
   if (detail.count === 1) {
     if (e?.shiftKey || e?.metaKey || e?.shiftKey) {
-      if (selectedNodes.value.length > 0) return;
       const newEdges = selectedEdges.value.filter((e) => e !== detail.edge);
       if (newEdges.length === selectedEdges.value.length) {
         newEdges.push(detail.edge);
@@ -357,10 +544,14 @@ const edgeMultiClick = (detail) => {
   }
 };
 const nodeMultiClick = (detail) => {
+  document.activeElement.blur();
   const e = detail.event;
   if (detail.count === 1) {
-    if (e?.shiftKey || e?.metaKey || e?.shiftKey) {
-      if (selectedEdges.value.length > 0) return;
+    if (e.altKey) {
+      selectedNodes.value = selectedNodes.value.filter(
+        (n) => n !== detail.node
+      );
+    } else if (e.shiftKey || e.metaKey || e.shiftKey) {
       const newNodes = selectedNodes.value.filter((n) => n !== detail.node);
       if (newNodes.length === selectedNodes.value.length) {
         newNodes.push(detail.node);
@@ -378,11 +569,11 @@ const nodeMultiClick = (detail) => {
       }
     }
     const dist = detail.count - nodeMultiClick.distDelay;
-    selectMultiNeighborhood([detail.node], dist);
+    selectMultiNeighborhood([detail.node], dist, e.altKey);
     nodeMultiClick.prevCount = detail.count;
   }
 };
-const selectMultiNeighborhood = (nodes, distance) => {
+const selectMultiNeighborhood = (nodes, distance, deselect) => {
   nodes = new Set(nodes);
   let newNodes;
   for (let i = 0; i < distance; i++) {
@@ -394,8 +585,12 @@ const selectMultiNeighborhood = (nodes, distance) => {
     });
     nodes = newNodes;
   }
-  for (const n of selectedNodes.value) {
-    nodes.add(n);
+  if (deselect) {
+    nodes = selectedNodes.value.filter((n) => !nodes.has(n));
+  } else {
+    for (const n of selectedNodes.value) {
+      nodes.add(n);
+    }
   }
   selectedEdges.value = [];
   selectedNodes.value = [...nodes];
@@ -658,6 +853,15 @@ const command = (code) => {
       case "resetView":
         resetView();
         break;
+      case "realign":
+        recordBeforeGraphMod();
+        styleStore.view.layoutHandler.findBestNodePositions(
+          Object.keys(gops.graph.nodes),
+          true,
+          true
+        );
+        recordAfterGraphMod("move nodes (realign to grid)");
+        break;
       case "Escape":
         // Clear selection
         selectedEdges.value = [];
@@ -797,15 +1001,16 @@ const checkCanDoCommand = {
   O: computed(() => checkCanDoCommand.P),
   // All modes
   Escape: computed(
-    () => selectedNodes.value.length > 0 || selectedNodes.value.length > 0
+    () => selectedNodes.value.length > 0 || selectedEdges.value.length > 0
   ),
   Undo: computed(
     () => !undoStore.isBottomOfHistory() || wereNodesOrEdgesSelected()
   ),
   Redo: computed(() => !undoStore.isTopOfHistory()),
+  selectAll: ref(true),
   fitView: ref(true),
   resetView: ref(true),
-  selectAll: ref(true),
+  realign: ref(true),
 };
 
 // Graph edit commands that adjust or use the selections before operating on the
@@ -859,18 +1064,20 @@ const addBoundaryNodes = () => {
   }
 };
 
-const deleteSelection = () => {
-  if (selectedNodes.value.length > 0) {
+const deleteSelection = (nodes) => {
+  nodes = nodes ?? selectedNodes.value;
+  if (nodes.length > 0) {
     // Delete nodes and select their neighborhood
     const select = [];
-    gops.forNodeCollectiveNeighborhood(selectedNodes.value, (node) => {
+    gops.forNodeCollectiveNeighborhood(nodes, (node) => {
       select.push(node);
     });
-    gops.deleteNodes(selectedNodes.value);
+    gops.deleteNodes(nodes);
     selectedNodes.value = select; // Gets cleared due to the deletion somehow
     window.setTimeout(() => {
       selectedNodes.value = select; // Hack fix
     }, 0);
+    delete paste.pasteContent;
   } else {
     // Delete edges and select their nodes
     const select = [];
@@ -918,6 +1125,95 @@ const addNodeAngles = () => {
   }
 };
 
+const cut = (nodes) => {
+  const ret = copy(nodes);
+  recordBeforeGraphMod();
+  deleteSelection(nodes);
+  recordAfterGraphMod("edit:cut");
+  delete paste.pasteContent;
+  return ret;
+};
+const copy = (nodes) => {
+  const ser = serialize(graphStore, nodes);
+  const copyStr = `${window.location.origin}${window.location.pathname}#${ser}`;
+  if (copyStr !== paste.pasteContent) {
+    paste.pasteContent = copyStr;
+    paste.pasteCount = 1;
+  }
+  const numNodes = Object.keys(nodes).length;
+  let numEdges = 0;
+  gops.forInnerEdgesOfNodes(nodes, () => (numEdges += 1));
+  return {
+    str: copyStr,
+    title: `ZX Diagram with ${numNodes} node${
+      numNodes === 1 ? "" : "s"
+    } and ${numEdges} edge${numEdges === 1 ? "" : "s"}`,
+  };
+};
+const paste = (pasteStr) => {
+  // Check if paste string is a graph or something else
+  const hashIndex = pasteStr.indexOf("#");
+  const bracketIndex = pasteStr.indexOf("{");
+  if (typeof pasteStr !== "string" || (hashIndex < 0 && bracketIndex !== 0)) {
+    return;
+  }
+  // Avoid node name conflicts
+  let max = -1;
+  for (const n of Object.keys(graphStore.nodes)) {
+    const di = n.indexOf("$");
+    if (n.slice(0, 2) === "cp" && di >= 0) {
+      const val = Math.ceil(Number(n.slice(2, di)));
+      if (isFinite(val) && val > max) {
+        max = val;
+      }
+    }
+  }
+  // Deserialize
+  const prefixI = max + 1;
+  if (pasteStr !== paste.pasteContent) {
+    paste.pasteCount = 0;
+  }
+  const offsetX = styleStore.layout.grid * 2 * (paste.pasteCount ?? 0);
+  const offsetY = offsetX;
+  let data;
+  if (bracketIndex === 0) {
+    // Parse from PyZX JSON
+    try {
+      data = fromPyzxJson(
+        pasteStr,
+        styleStore.layout.distance,
+        `cp${prefixI}$`,
+        offsetX,
+        offsetY
+      );
+    } catch (e) {
+      console.error("Graph parse from paste PyZX JSON failed:", e.message || e);
+      return;
+    }
+  } else {
+    // Parse from URL encoding
+    try {
+      const ser = decodeURIComponent(pasteStr.slice(hashIndex + 1));
+      data = deserialize(ser, `cp${prefixI}$`, offsetX, offsetY);
+    } catch (e) {
+      console.error("Graph parse from paste URL failed:", e.message || e);
+      return;
+    }
+  }
+  paste.pasteContent = pasteStr;
+  paste.pasteCount = (paste.pasteCount ?? 0) + 1;
+  // Add to graph
+  recordBeforeGraphMod();
+  Object.assign(graphStore.nodes, data.nodes);
+  Object.assign(graphStore.edges, data.edges);
+  Object.assign(graphStore.paths, data.paths);
+  Object.assign(graphStore.layouts.nodes, data.layouts.nodes);
+  selectedNodes.value = Object.keys(data.nodes);
+  selectedEdges.value = [];
+  recordAfterGraphMod(`edit:paste`);
+  return true;
+};
+
 const reversePivotStep1Or2 = (addPi) => {
   recordBeforeGraphMod();
   let step;
@@ -938,14 +1234,13 @@ const reversePivotStep1Or2 = (addPi) => {
 };
 
 // Import and export graph
-const importModalVisible = ref(false);
 const importErrorMsg = ref("");
 const importPyzx = (str) => {
   let data;
   try {
     data = fromPyzxJson(str, styleStore.layout.distance);
   } catch (e) {
-    console.error("failed to load PyZX JSON:", e);
+    console.error("failed to load PyZX JSON:", e.message || e);
     importErrorMsg.value = e.message || `${e}`;
     return;
   }
@@ -953,14 +1248,18 @@ const importPyzx = (str) => {
     recordBeforeGraphMod();
     graphStateFullReplace(data);
     recordAfterGraphMod("import:pyzx json");
-    importModalVisible.value = false;
+    modalVisible.value = false;
   }
 };
 
 const pyzxJsonStr = ref("");
 const exportPyzx = () => {
   updateNodesMaybeMoved();
-  pyzxJsonStr.value = toPyzxJson(graphStore, styleStore.layout.distance);
+  pyzxJsonStr.value = toPyzxJson(
+    graphStore,
+    undefined,
+    styleStore.layout.distance
+  );
 };
 
 const svgOutStrGet = () => {
@@ -1041,8 +1340,9 @@ const getAsSvg = (vgraph, permalink) => {
       @exportPyzx="exportPyzx"
       :pyzxJsonOutStr="pyzxJsonStr"
       :svgOutStrGet="svgOutStrGet"
-      v-model:importVisible="importModalVisible"
       v-model:importErrorMsg="importErrorMsg"
+      v-model:modalVisible="modalVisible"
+      :dragoverVisible="dragOverlayVisible"
     />
   </div>
 </template>

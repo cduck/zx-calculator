@@ -23,14 +23,14 @@ export const assert = (condition, msg) => {
 };
 
 export class GraphOps {
-  constructor(graph, setNewNodePositions) {
+  constructor(graph, findBestNodePositions) {
     this.graph = graph ?? {
       nodes: {},
       edges: {},
       paths: {},
       layouts: { nodes: {} },
     };
-    this.setNewNodePositions = setNewNodePositions;
+    this.findBestNodePositions = findBestNodePositions;
 
     this.nextNodeIndex = Object.keys(this.graph.nodes).length + 1;
     this.nextEdgeIndex = Object.keys(this.graph.edges).length + 1;
@@ -403,8 +403,9 @@ export class GraphOps {
     }
     if (x !== undefined && y !== undefined) {
       this.graph.layouts.nodes[nodeId] = { x: x, y: y };
-    } else if (this.setNewNodePositions) {
-      this.setNewNodePositions([nodeId]);
+    }
+    if (this.findBestNodePositions) {
+      this.findBestNodePositions([nodeId]);
     }
     return nodeId;
   }

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from "vue";
+import { ref, toRef, watch } from "vue";
 import {
   ElInput,
   ElButton,
@@ -19,6 +19,7 @@ import {
   QuestionFilled,
   FullScreen,
   Rank,
+  Grid,
 } from "@element-plus/icons-vue";
 import ModalOverlay from "@/components/ModalOverlay.vue";
 import { usePanelStore } from "@/stores/panels.js";
@@ -50,11 +51,20 @@ const leftTooltipHide = () => {
 };
 
 // Angle input text fields
+const setAngleInput = ref();
+const addAngleInput = ref();
+const splitNodeInput = ref();
+const closeSuggestions = () => {
+  setAngleInput.value.close();
+  addAngleInput.value.close();
+  splitNodeInput.value.close();
+};
 const angleSuggestions = (query, callback) => {
   callback(angles.DEFAULT_SUGGESTIONS);
 };
 
 // Import and export
+const importVisible = ref(false);
 const exportVisible = ref(false);
 const helpVisible = ref(false);
 const pyzxJsonText = ref("");
@@ -150,21 +160,39 @@ const props = defineProps({
   checkCanDoCommand: Object,
   pyzxJsonOutStr: String,
   svgOutStrGet: Function,
-  importVisible: Boolean,
   importErrorMsg: String,
+  modalVisible: Boolean,
+  dragoverVisible: Boolean,
 });
 const emit = defineEmits([
   "command",
   "importPyzx",
   "exportPyzx",
   "saveImageContent",
-  "update:importVisible",
   "update:importErrorMsg",
+  "update:modalVisible",
 ]);
+watch(toRef(props, "modalVisible"), (newVis) => {
+  if (!newVis) {
+    importVisible.value = exportVisible.value = helpVisible.value = false;
+  }
+});
+watch(
+  () => [importVisible.value, exportVisible.value, helpVisible.value],
+  () => {
+    emit(
+      "update:modalVisible",
+      importVisible.value || exportVisible.value || helpVisible.value
+    );
+  }
+);
 </script>
 
 <template>
   <div class="grid-container">
+    <!-- Drag over indicator -->
+    <div class="dragover-box" v-show="dragoverVisible"></div>
+
     <!-- Show panel button -->
     <Transition name="btn-fade">
       <div class="panelx show-btn" v-show="!show">
@@ -215,7 +243,7 @@ const emit = defineEmits([
                 <ElButton
                   @click="
                     emit('update:importErrorMsg', '');
-                    emit('update:importVisible', !importVisible);
+                    importVisible = !importVisible;
                   "
                 >
                   Import
@@ -229,6 +257,14 @@ const emit = defineEmits([
                   Export
                 </ElButton>
               </ElButtonGroup>
+              <a
+                class="btn"
+                :href="oldSaveImageUrl"
+                target="_blank"
+                @click="saveImage()"
+              >
+                <ElButton :icon="Camera" />
+              </a>
               <ElButton
                 class="btn"
                 :icon="QuestionFilled"
@@ -331,6 +367,7 @@ const emit = defineEmits([
             placeholder="Set Angle"
             :fetch-suggestions="angleSuggestions"
             @select="() => emit('command', 'a')"
+            @blur="closeSuggestions()"
             :trigger-on-focus="true"
             clearable
             hide-loading
@@ -338,6 +375,7 @@ const emit = defineEmits([
               'inline-input': true,
               'disable-btn': !props.checkCanDoCommand.a.value,
             }"
+            ref="setAngleInput"
           >
             <template #append>
               <div
@@ -359,12 +397,14 @@ const emit = defineEmits([
             placeholder="Add Angle"
             :fetch-suggestions="angleSuggestions"
             @select="() => emit('command', 'A')"
+            @blur="closeSuggestions()"
             :trigger-on-focus="true"
             clearable
             :class="{
               'inline-input': true,
               'disable-btn': !props.checkCanDoCommand.A.value,
             }"
+            ref="addAngleInput"
           >
             <template #append>
               <div
@@ -476,6 +516,7 @@ const emit = defineEmits([
             placeholder="Split Node"
             :fetch-suggestions="angleSuggestions"
             @select="() => emit('command', 'J')"
+            @blur="closeSuggestions()"
             :trigger-on-focus="true"
             clearable
             hide-loading
@@ -483,6 +524,7 @@ const emit = defineEmits([
               'inline-input': true,
               'disable-btn': !props.checkCanDoCommand.J.value,
             }"
+            ref="splitNodeInput"
           >
             <template #append>
               <div
@@ -584,14 +626,13 @@ const emit = defineEmits([
           >
             Reset View
           </ElButton>
-          <a
+          <ElButton
             class="btn"
-            :href="oldSaveImageUrl"
-            target="_blank"
-            @click="saveImage()"
+            :icon="Grid"
+            @click="emit('command', 'realign')"
           >
-            <ElButton style="width: 100%" :icon="Camera">Screenshot</ElButton>
-          </a>
+            Realign to Grid
+          </ElButton>
           <ElSwitch
             v-model="styleStore.view.grid.visible"
             inactive-text=""
@@ -637,7 +678,7 @@ const emit = defineEmits([
     <div style="text-align: center; width: calc(80vw + 20px)">
       <ElUpload
         drag
-        accept=".json,application/json,text/json"
+        accept=".json,application/json,text/json,.txt,text/plain"
         :http-request="importPyzxJsonFileTriggered"
         action=""
         class="wide-upload"
@@ -760,6 +801,10 @@ const emit = defineEmits([
 .panel-bottom {
   grid-column: leftmid / rightmid;
   grid-row: bottommid / bottom;
+}
+.dragover-box {
+  grid-column: leftmid / rightmid;
+  grid-row: topmid / bottommid;
 }
 .panelx,
 .panely {
@@ -897,6 +942,13 @@ a.btn {
 .version {
   color: #999;
   margin-left: 1em;
+}
+
+.dragover-box {
+  background-color: rgba(64, 158, 255, 0.1);
+  border: 2px dashed #409eff;
+  border-radius: 6px;
+  pointer-events: none;
 }
 </style>
 

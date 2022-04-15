@@ -13,8 +13,11 @@ const niceNumber = (v) => {
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 
 // Parses a subset of the PyZX output JSON
-export const fromPyzxJson = (str, scale) => {
+export const fromPyzxJson = (str, scale, idPrefix, offsetX, offsetY) => {
   scale = scale ?? 1;
+  idPrefix = idPrefix ?? "";
+  offsetX = offsetX ?? 0;
+  offsetY = offsetY ?? 0;
   // Parse JSON
   const pyzx = JSON.parse(str);
   //if (pyzx?.layouts?.nodes) {
@@ -27,19 +30,22 @@ export const fromPyzxJson = (str, scale) => {
   // Load boundaries
   const nodes = {};
   const locations = {};
-  for (const [node, params] of Object.entries(pyzx.wire_vertices ?? {})) {
+  for (let [node, params] of Object.entries(pyzx.wire_vertices ?? {})) {
+    node = idPrefix + node;
     nodes[node] = {
       zxType: "boundary",
     };
     locations[node] = {
-      x: niceNumber(params?.annotation?.coord?.[0]) * scale,
-      y: -niceNumber(params?.annotation?.coord?.[1]) * scale,
+      x: niceNumber(params?.annotation?.coord?.[0]) * scale + offsetX,
+      y: -niceNumber(params?.annotation?.coord?.[1]) * scale + offsetY,
     };
   }
   // Load other nodes (including Hadamard edge nodes)
   const pretendNodes = {};
-  for (const [node, params] of Object.entries(pyzx.node_vertices ?? {})) {
-    if (hasOwn(nodes, node) || hasOwn(pretendNodes, node)) {
+  for (let [node, params] of Object.entries(pyzx.node_vertices ?? {})) {
+    const origName = node;
+    node = idPrefix + node;
+    if (hasOwn(nodes, node) || hasOwn(pretendNodes, origName)) {
       throw new GraphImportException(
         `multiple nodes have the same name key "${node}"`
       );
@@ -57,7 +63,7 @@ export const fromPyzxJson = (str, scale) => {
         );
         type = "unknown";
       }
-      pretendNodes[node] = type;
+      pretendNodes[origName] = type;
     } else {
       // A real node
       let type;
@@ -86,31 +92,34 @@ export const fromPyzxJson = (str, scale) => {
         nodes[node].zxAngle = angle;
       }
       locations[node] = {
-        x: niceNumber(params?.annotation?.coord?.[0]) * scale,
-        y: -niceNumber(params?.annotation?.coord?.[1]) * scale,
+        x: niceNumber(params?.annotation?.coord?.[0]) * scale + offsetX,
+        y: -niceNumber(params?.annotation?.coord?.[1]) * scale + offsetY,
       };
     }
   }
   // Load normal edges
   const edges = {};
   const pretendNodeNeighbors = {};
-  for (const [edge, params] of Object.entries(pyzx.undir_edges)) {
-    const src = params?.src;
-    const tgt = params?.tgt;
+  for (let [edge, params] of Object.entries(pyzx.undir_edges)) {
+    edge = idPrefix + edge;
+    const origSrc = params?.src;
+    const origTgt = params?.tgt;
+    const src = origSrc && idPrefix + origSrc;
+    const tgt = origTgt && idPrefix + origTgt;
     if (!(hasOwn(nodes, src) && hasOwn(nodes, tgt))) {
       // Handle edges to pretend nodes
-      if (hasOwn(pretendNodes, src)) {
-        pretendNodeNeighbors[src] = pretendNodeNeighbors[src] ?? [];
-        pretendNodeNeighbors[src].push(tgt);
-        if (hasOwn(pretendNodes, tgt)) {
+      if (hasOwn(pretendNodes, origSrc)) {
+        pretendNodeNeighbors[origSrc] = pretendNodeNeighbors[origSrc] ?? [];
+        pretendNodeNeighbors[origSrc].push(tgt);
+        if (hasOwn(pretendNodes, origTgt)) {
           throw new GraphImportException("pretend node is acting like a node");
         }
-      } else if (hasOwn(pretendNodes, tgt)) {
-        pretendNodeNeighbors[tgt] = pretendNodeNeighbors[tgt] ?? [];
-        pretendNodeNeighbors[tgt].push(src);
+      } else if (hasOwn(pretendNodes, origTgt)) {
+        pretendNodeNeighbors[origTgt] = pretendNodeNeighbors[origTgt] ?? [];
+        pretendNodeNeighbors[origTgt].push(src);
       } else {
         throw new GraphImportException(
-          `edge references nonexistant node(s) "${src}", "${tgt}"`
+          `edge references nonexistant node(s) "${origSrc}", "${origTgt}"`
         );
       }
     } else {
@@ -129,7 +138,7 @@ export const fromPyzxJson = (str, scale) => {
     }
     const [n1, n2] = neighbors.sort();
     const type = pretendNodes[pnode];
-    edges[`e!${pnode}`] = {
+    edges[`${idPrefix}e!${pnode}`] = {
       source: n1,
       target: n2,
       zxType: type,
@@ -146,7 +155,7 @@ export const fromPyzxJson = (str, scale) => {
   };
 };
 
-export const toPyzxJson = (graph, scale, prettyIndent) => {
+export const toPyzxJson = (graph, subgraphNodes, scale, prettyIndent) => {
   //return JSON.stringify(graph, null, 2);
 
   scale = scale ?? 1;
@@ -162,7 +171,9 @@ export const toPyzxJson = (graph, scale, prettyIndent) => {
   const vertices = {};
   const edges = {};
   // Nodes
-  for (const [n, p] of Object.entries(graph.nodes)) {
+  const inNodes = subgraphNodes ?? Object.keys(graph.nodes);
+  for (const n of inNodes) {
+    const p = graph.nodes[n];
     const { x, y } = graph.layouts.nodes[n] ?? { x: 0, y: 0 };
     if (p.zxType === "boundary") {
       nodeIdMap[n] = `b${boundaryI}`;
@@ -193,6 +204,9 @@ export const toPyzxJson = (graph, scale, prettyIndent) => {
   }
   // Edges including pretend nodes
   for (const [e, p] of Object.entries(graph.edges)) {
+    if (!hasOwn(nodeIdMap, p.source) || !hasOwn(nodeIdMap, p.target)) {
+      continue; // Skip edge outside of subgraph
+    }
     if (p.zxType === "normal") {
       edgeIdMap[e] = `e${edgeI}`;
       edgeI += 1;
