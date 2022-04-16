@@ -428,6 +428,19 @@ watch(
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
+            tooltip="Toggle node or edge color [R]"
+          >
+            <ElButton
+              class="btn btn100"
+              @click="emit('command', 'r')"
+              :disabled="!props.checkCanDoCommand.rEdit.value"
+            >
+              Toggle Color
+            </ElButton>
+          </div>
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
             tooltip="Delete all selected nodes or edges [X]"
           >
             <ElButton
@@ -490,14 +503,14 @@ watch(
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Reverse Hadamard Cancellation:<br />Insert two Hadamard edges by adding two Z nodes [Shift+H]"
+            tooltip="Reverse Hadamard Cancellation:<br />Insert two Hadamard edges by adding two Z nodes [Shift+H or Shirt+G]"
           >
             <ElButton
               class="btn btn100"
               @click="emit('command', 'H')"
               :disabled="!props.checkCanDoCommand.H.value"
             >
-              Insert 2 Nodes
+              Insert Nodes
             </ElButton>
           </div>
           <div
@@ -533,7 +546,7 @@ watch(
               <div
                 @mouseenter="leftTooltipMouseEnter"
                 @mouseleave="leftTooltipMouseLeave"
-                tooltip="Split a node into two nodes (connected by a degree-2 node) with the selected edges (and given angle) separated from its other edges [Shift+J]"
+                tooltip="Split a node into two nodes (connected by a degree-2 node) with the selected edges (and given angle) separated from its other edges [Shift+J or Shift+K]"
               >
                 <ElButton
                   class="btn"
@@ -545,6 +558,19 @@ watch(
             </template>
           </ElAutocomplete>
           Select single node:
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Color Switch:<br />Convert a node between Z-type and X-type by changing its edge types [R]"
+          >
+            <ElButton
+              class="btn btn100"
+              @click="emit('command', 'r')"
+              :disabled="!props.checkCanDoCommand.rRewrite.value"
+            >
+              Toggle Color
+            </ElButton>
+          </div>
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"

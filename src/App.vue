@@ -654,6 +654,20 @@ const command = (code) => {
         addNodeAngles();
         recordAfterGraphMod("edit:add angle");
         break;
+      case "r":
+        recordBeforeGraphMod();
+        for (const n of selectedNodes.value) {
+          try {
+            grewrite.toggleNodeColor(n);
+          } catch (e) {
+            if (!(e instanceof GraphRewriteException)) throw e;
+          }
+        }
+        for (const e of selectedEdges.value) {
+          gops.toggleEdgeColor(e);
+        }
+        recordAfterGraphMod("edit:toggle color");
+        break;
       case "s":
         recordBeforeGraphMod();
         gops.addPathByEdges(selectedEdges.value);
@@ -677,6 +691,18 @@ const command = (code) => {
   } else {
     // Rewrite mode
     switch (code) {
+      case "r":
+        recordBeforeGraphMod();
+        for (const n of selectedNodes.value) {
+          try {
+            grewrite.toggleNodeColor(n);
+          } catch (e) {
+            if (!(e instanceof GraphRewriteException)) throw e;
+          }
+        }
+        recordAfterGraphMod("rewrite:toggle color");
+        break;
+      case "g":
       case "h": {
         // Hadamard cancellation
         recordBeforeGraphMod();
@@ -696,25 +722,13 @@ const command = (code) => {
         recordAfterGraphMod("rewrite:hadamard cancellation");
         break;
       }
-      case "H": {
-        // Reverse Hadamard cancellation
-        const middleEdges = [];
-        recordBeforeGraphMod();
-        for (const e of selectedEdges.value) {
-          try {
-            middleEdges.push(grewrite.hEdgeToTwoNodes(e)[1][1]);
-          } catch (e) {
-            console.warn(e.message);
-          }
-        }
-        selectedEdges.value = middleEdges;
-        selectedNodes.value = [];
-        window.setTimeout(() => {
-          selectedEdges.value = middleEdges; // Hack
-        }, 0);
-        recordAfterGraphMod("rewrite:reverse hadamard cancellation");
+      case "H": // Reverse Hadamard cancellation
+        reverseHadamardCancellation(false);
         break;
-      }
+      case "G": // Reverse Hadamard cancellation (Using X node)
+        reverseHadamardCancellation(true);
+        break;
+      case "k":
       case "j": {
         // Hadamard cancellation / merge node
         recordBeforeGraphMod();
@@ -734,45 +748,12 @@ const command = (code) => {
         recordAfterGraphMod("rewrite:merge node");
         break;
       }
-      case "J": {
-        // Split node
-        recordBeforeGraphMod();
-        try {
-          panelStore.angleToSplit = angles.cleanInputStr(
-            panelStore.angleToSplit
-          );
-        } catch {
-          panelStore.angleToSplit = "";
-        }
-        const newNodes = [];
-        if (selectedEdges.value.length > 0) {
-          try {
-            newNodes.push(
-              grewrite.splitNode(
-                undefined,
-                selectedEdges.value,
-                panelStore.angleToSplit
-              )
-            );
-          } catch (e) {
-            console.warn(e.message);
-          }
-        } else {
-          for (const n of selectedNodes.value) {
-            try {
-              newNodes.push(
-                grewrite.splitNode(n, "all", panelStore.angleToSplit)
-              );
-            } catch (e) {
-              console.warn(e.message);
-            }
-          }
-        }
-        selectedNodes.value = newNodes;
-        selectedEdges.value = [];
-        recordAfterGraphMod("rewrite:split node");
+      case "J": // Split node
+        splitNodes(false);
         break;
-      }
+      case "K": // Split node (Using X node)
+        splitNodes(true);
+        break;
       case "v":
       case "c": // Complementation
         recordBeforeGraphMod();
@@ -947,6 +928,13 @@ const checkCanDoCommand = {
     }
     return false;
   }),
+  rEdit: computed(() => {
+    if (selectedEdges.value.length > 0) return true;
+    for (const n of selectedNodes.value) {
+      if (gops.isZOrXNode(n)) return true;
+    }
+    return false;
+  }),
   s: computed(() => gops.isEdgesValidPath(selectedEdges.value, true)),
   S: computed(() => {
     // Check if any edges are on a path
@@ -958,6 +946,12 @@ const checkCanDoCommand = {
   }),
   clear: computed(() => Object.keys(graphStore.nodes).length >= 1),
   // Rewrite mode
+  rRewrite: computed(() => {
+    for (const n of selectedNodes.value) {
+      if (grewrite.toggleNodeColorIsValid(n)) return true;
+    }
+    return false;
+  }),
   h: computed(() => {
     for (const edge of selectedEdges.value) {
       if (grewrite.removeHEdgeWithDegree2NodesIsValid(edge)) return true;
@@ -966,10 +960,11 @@ const checkCanDoCommand = {
   }),
   H: computed(() => {
     for (const edge of selectedEdges.value) {
-      if (grewrite.hEdgeToTwoNodesIsValid(edge)) return true;
+      if (grewrite.edgeToOneOrTwoNodesIsValid(edge)) return true;
     }
     return false;
   }),
+  G: computed(() => checkCanDoCommand.H),
   j: computed(() => {
     for (const node of selectedNodes.value) {
       if (grewrite.removeDegree2NodeWithHEdgesIsValid(node)) return true;
@@ -983,6 +978,7 @@ const checkCanDoCommand = {
     }
     return false;
   }),
+  K: computed(() => checkCanDoCommand.J),
   c: computed(() => {
     if (selectedNodes.value.length !== 1) return false;
     return grewrite.localComplementationIsValid(selectedNodes.value[0]);
@@ -1008,6 +1004,11 @@ const checkCanDoCommand = {
   P: computed(() => checkCanDoCommand.P1.value || checkCanDoCommand.P2.value),
   O: computed(() => checkCanDoCommand.P),
   // All modes
+  r: computed(() =>
+    panelStore.rewriteMode
+      ? checkCanDoCommand.rRewrite
+      : checkCanDoCommand.rEdit
+  ),
   Escape: computed(
     () => selectedNodes.value.length > 0 || selectedEdges.value.length > 0
   ),
@@ -1239,6 +1240,66 @@ const reversePivotStep1Or2 = (addPi) => {
     selectedNodes.value = [node];
   }
   recordAfterGraphMod(`rewrite:reverse pivot (step ${step})`);
+};
+
+const reverseHadamardCancellation = (useX) => {
+  const middleEdges = [];
+  recordBeforeGraphMod();
+  for (const e of selectedEdges.value) {
+    try {
+      middleEdges.push(grewrite.edgeToOneOrTwoNodes(e, useX ? "x" : "z"));
+    } catch (e) {
+      if (!(e instanceof GraphRewriteException)) throw e;
+    }
+  }
+  selectedEdges.value = middleEdges;
+  selectedNodes.value = [];
+  window.setTimeout(() => {
+    selectedEdges.value = middleEdges; // Hack
+  }, 0);
+  recordAfterGraphMod("rewrite:reverse hadamard cancellation");
+};
+
+const splitNodes = (useX) => {
+  recordBeforeGraphMod();
+  try {
+    panelStore.angleToSplit = angles.cleanInputStr(panelStore.angleToSplit);
+  } catch {
+    panelStore.angleToSplit = "";
+  }
+  const newNodes = [];
+  if (selectedEdges.value.length > 0) {
+    try {
+      newNodes.push(
+        grewrite.splitNode(
+          undefined,
+          selectedEdges.value,
+          panelStore.angleToSplit,
+          useX ? "x" : "z"
+        )
+      );
+    } catch (e) {
+      console.warn(e.message);
+    }
+  } else {
+    for (const n of selectedNodes.value) {
+      try {
+        newNodes.push(
+          grewrite.splitNode(
+            n,
+            "all",
+            panelStore.angleToSplit,
+            useX ? "x" : "z"
+          )
+        );
+      } catch (e) {
+        console.warn(e.message);
+      }
+    }
+  }
+  selectedNodes.value = newNodes;
+  selectedEdges.value = [];
+  recordAfterGraphMod("rewrite:split node");
 };
 
 // Import and export graph

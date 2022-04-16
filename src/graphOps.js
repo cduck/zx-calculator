@@ -22,6 +22,15 @@ export const assert = (condition, msg) => {
   }
 };
 
+const TOGGLE_EDGE_MAP = {
+  "hadamard": "normal",
+  "normal": "hadamard",
+};
+const TOGGLE_NODE_MAP = {
+  "z": "x",
+  "x": "z",
+};
+
 export class GraphOps {
   constructor(graph, findBestNodePositions) {
     this.graph = graph ?? {
@@ -472,6 +481,28 @@ export class GraphOps {
       } else if ((edges.length + !dontToggle) % 2 == 1) {
         return edges[0];
       }
+    }
+  }
+
+  toggleEdgeColor(edgeId) {
+    const zxType = this.edgeType(edgeId);
+    const newType = TOGGLE_EDGE_MAP[zxType];
+    if (newType && newType !== zxType) {
+      this.graph.edges[edgeId] = {
+        ...this.graph.edges[edgeId],
+        zxType: newType,
+      };
+    }
+  }
+
+  toggleNodeColor(nodeId) {
+    const zxType = this.nodeType(nodeId);
+    const newType = TOGGLE_NODE_MAP[zxType];
+    if (newType && newType !== zxType) {
+      this.graph.nodes[nodeId] = {
+        ...this.graph.nodes[nodeId],
+        zxType: newType,
+      };
     }
   }
 

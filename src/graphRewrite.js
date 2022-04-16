@@ -22,6 +22,31 @@ export class GraphRewrite {
     this.graphOps = graphOps;
   }
 
+  // Node color toggle
+  // Changes Z to X and X to Z by toggling the node's edges between Hadamard and
+  // normal types
+  toggleNodeColorIsValid(node) {
+    try {
+      this.toggleNodeColor(node, true);
+    } catch (e) {
+      if (e instanceof GraphRewriteException) return false;
+      throw e;
+    }
+    return true;
+  }
+  toggleNodeColor(node, dryRun) {
+    if (!this.graphOps.isZOrXNode(node)) {
+      throw new GraphRewriteException("node is not Z- or X-type");
+    }
+    if (dryRun) {
+      return;
+    }
+    this.graphOps.toggleNodeColor(node);
+    this.graphOps.forEdgesOfNodes([node], (edge) => {
+      this.graphOps.toggleEdgeColor(edge);
+    });
+  }
+
   // Reverse Hadamard cancellation
   // Works on any edge type (hadamard or normal) with any nodes
   // Argument zxNodeType may be "z" (default) or "x"
@@ -70,6 +95,74 @@ export class GraphRewrite {
         }
       }
       return [newNodes, newEdges];
+    }
+  }
+
+  // Reverse Hadamard cancellation
+  // Works on any edge type (hadamard or normal) with any nodes
+  // Argument zxNodeType may be "z" (default) or "x"
+  // If a normal edge with a boundary node, makes sure the new normal edge is
+  // still connected to the boundary
+  edgeToOneOrTwoNodesIsValid(edge, zxNodeType) {
+    try {
+      this.edgeToOneOrTwoNodes(edge, zxNodeType, true);
+    } catch (e) {
+      if (e instanceof GraphRewriteException) return false;
+      throw e;
+    }
+    return true;
+  }
+  edgeToOneOrTwoNodes(edge, zxNodeType, dryRun) {
+    zxNodeType = zxNodeType ?? "z";
+    const oldType = this.graphOps.edgeType(edge);
+    let [n1, n2] = this.graphOps.nodesOfEdge(edge);
+    if (!(zxNodeType === "z" || zxNodeType === "x")) {
+      throw new GraphRewriteException(
+        `invalid node type "${zxNodeType}" not "x" or "z"`
+      );
+    }
+    if (dryRun) {
+      return;
+    }
+    const flip =
+      this.graphOps.isBoundaryNode(n2) && !this.graphOps.isBoundaryNode(n1);
+    if (flip) {
+      [n1, n2] = [n2, n1];
+    }
+    if (this.graphOps.isBoundaryNode(n1)) {
+      // Edge on a boundary
+      // Add one new node so the edge left on the boundary is opposite type
+      const [, newEdges] = this.graphOps.insertNewNodesAlongEdge(
+        edge,
+        1,
+        "hadamard",
+        zxNodeType
+      );
+      const bEdge = flip ? newEdges[newEdges.length - 1] : newEdges[0];
+      if (oldType === "hadamard") {
+        this.graphOps.setEdgeType(bEdge, "normal");
+      }
+      return bEdge;
+    } else if (oldType === "normal") {
+      // Edge is normal in interior
+      // Add one new node so the new edges are all Hadamard
+      const [, newEdges] = this.graphOps.insertNewNodesAlongEdge(
+        edge,
+        1,
+        "hadamard",
+        zxNodeType
+      );
+      return newEdges[1]; // Return one of the two edges arbitrarily
+    } else {
+      // Edge is Hadamard in interior
+      // Add two new nodes so the new edges are all Hadamard
+      const [, newEdges] = this.graphOps.insertNewNodesAlongEdge(
+        edge,
+        2,
+        "hadamard",
+        zxNodeType
+      );
+      return newEdges[1]; // Return the middle edge
     }
   }
 
