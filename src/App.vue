@@ -170,12 +170,6 @@ const loadConfig = () => {
 
 // Catch key strokes
 const keydown = (e) => {
-  if (
-    e.target instanceof HTMLInputElement ||
-    e.target instanceof HTMLTextAreaElement
-  ) {
-    return;
-  }
   let used = false;
   const code = e.which || e.charCode || e.keyCode || 0;
   let k =
@@ -184,30 +178,47 @@ const keydown = (e) => {
       : e.shiftKey
       ? String.fromCharCode(code).toUpperCase()
       : String.fromCharCode(code).toLowerCase();
-  if (modalVisible.value) {
+  const onInput =
+    e.target instanceof HTMLInputElement ||
+    e.target instanceof HTMLTextAreaElement;
+  if (modalVisible.value && !onInput) {
     if (k === "Escape") {
       // Press escape to close the modal view
       modalVisible.value = false;
       used = true;
     }
     // Don't run commands when a modal view is covering the graph
-  } else {
-    if (!e.altKey && !e.ctrlKey && !e.metaKey) {
-      // Allow backspace or 'x'
-      if (k === "Backspace") {
-        k = e.shiftKey ? "X" : "x";
-      }
-      used = command(k);
-    } else if (e.metaKey ^ e.ctrlKey) {
+  }
+  if (
+    !e.altKey &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !onInput &&
+    !modalVisible.value
+  ) {
+    // Allow backspace or 'x'
+    if (k === "Backspace") {
+      k = e.shiftKey ? "X" : "x";
+    }
+    // Single key commands
+    used = command(k);
+  } else if (e.metaKey ^ e.ctrlKey && !e.altKey) {
+    // (Shift)+letter shortcuts
+    if (k === "s") {
+      command("save");
+      used = true;
+    } else if (k === "o" && !e.shiftKey) {
+      command("open");
+      modalVisible.value = false;
+      used = true;
+    } else if (!onInput && !modalVisible.value) {
+      // Shortcuts that should be allowed their defaults when not used
       if (k === "z" && !e.shiftKey) {
         used = command("Undo");
       } else if ((k === "Z" && e.shiftKey) || (k === "y" && !e.shiftKey)) {
         used = command("Redo");
       } else if (k === "a" && !e.shiftKey) {
         used = command("selectAll");
-      } else if (k === "s" && !e.shiftKey) {
-        save();
-        used = true;
       }
     }
   }
@@ -862,6 +873,12 @@ const command = (code) => {
           selectedNodes.value = Object.keys(gops.graph.nodes);
         }
         break;
+      case "save":
+        save();
+        break;
+      case "open":
+        open();
+        break;
       default:
         used = false;
         break;
@@ -1023,6 +1040,8 @@ const checkCanDoCommand = {
   fitView: ref(true),
   resetView: ref(true),
   realign: ref(true),
+  save: ref(true),
+  open: ref(true),
 };
 
 // Graph edit commands that adjust or use the selections before operating on the
@@ -1385,6 +1404,20 @@ const save = () => {
   } finally {
     setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
   }
+};
+const open = () => {
+  if (!open.input) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json,text/json,.txt,text/plain";
+    input.addEventListener("input", () => {
+      if (input.files.length > 0) {
+        input.files[0].text().then(importPyzx);
+      }
+    });
+    open.input = input;
+  }
+  open.input.dispatchEvent(new MouseEvent("click"));
 };
 
 const svgOutStrGet = () => {

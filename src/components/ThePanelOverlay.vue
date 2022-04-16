@@ -702,10 +702,7 @@ watch(
 
   <!-- Pop-up views that cover the screen -->
   <!-- Import Graph -->
-  <ModalOverlay
-    :visible="importVisible"
-    @update:visible="(v) => emit('update:importVisible', v)"
-  >
+  <ModalOverlay v-model:visible="importVisible">
     <div style="text-align: center; width: calc(80vw + 20px)">
       <ElUpload
         drag
