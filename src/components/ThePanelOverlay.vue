@@ -55,9 +55,11 @@ const setAngleInput = ref();
 const addAngleInput = ref();
 const splitNodeInput = ref();
 const closeSuggestions = () => {
-  setAngleInput.value.close();
-  addAngleInput.value.close();
-  splitNodeInput.value.close();
+  window.setTimeout(() => {
+    setAngleInput.value.close();
+    addAngleInput.value.close();
+    splitNodeInput.value.close();
+  }, 100);
 };
 const angleSuggestions = (query, callback) => {
   callback(angles.DEFAULT_SUGGESTIONS);
