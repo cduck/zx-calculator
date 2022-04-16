@@ -250,6 +250,8 @@ const expressionToPretty = (expr) => {
   );
   // Replace with nice cdot symbol
   str = str.replaceAll("*", "·");
+  // Fix a+-pi/2
+  str = str.replaceAll("+-", "-");
   return str;
 };
 
