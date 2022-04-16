@@ -80,9 +80,12 @@ export class UndoHistory {
       time = undefined;
     }
     let found = false;
+    let rmode = undefined;
     if (fingerprint) {
       if (this.goingForward) {
         for (let i = 0; i < this.history.length; i++) {
+          const m = this.history[i].data.rewriteMode;
+          if (m === true || m === false) rmode = m;
           if (this.history[i].fingerprint === fingerprint) {
             found = true;
             this.currentIndex = i;
@@ -91,6 +94,8 @@ export class UndoHistory {
         }
       } else {
         for (let i = this.history.length - 1; i >= 0; i--) {
+          const m = this.history[i].data.rewriteMode;
+          if (m === true || m === false) rmode = m;
           if (this.history[i].fingerprint === fingerprint) {
             found = true;
             this.currentIndex = i;
@@ -103,7 +108,11 @@ export class UndoHistory {
       // This is in known history, go there
       delete this.outOfHistory;
       if (this.browserNavigateCallback) {
-        this.browserNavigateCallback(this.history[this.currentIndex].data);
+        const data = {
+          ...this.history[this.currentIndex].data,
+          rewriteMode: rmode,
+        };
+        this.browserNavigateCallback(data);
       }
       if (
         this.currentIndex < this.history.length - 1 &&

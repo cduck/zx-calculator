@@ -16,7 +16,7 @@ import {
   Scissor,
   UploadFilled,
   Camera,
-  QuestionFilled,
+  Reading,
   FullScreen,
   Rank,
   Grid,
@@ -263,12 +263,13 @@ watch(
                 target="_blank"
                 @click="saveImage()"
               >
-                <ElButton :icon="Camera" />
+                <ElButton :icon="Camera" title="Screenshot" />
               </a>
               <ElButton
                 class="btn"
-                :icon="QuestionFilled"
+                :icon="Reading"
                 @click="helpVisible = !helpVisible"
+                title="Documentation"
               />
             </div>
             <div
