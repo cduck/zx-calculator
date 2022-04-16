@@ -656,15 +656,12 @@ const command = (code) => {
         break;
       case "r":
         recordBeforeGraphMod();
-        for (const n of selectedNodes.value) {
-          try {
-            grewrite.toggleNodeColor(n);
-          } catch (e) {
-            if (!(e instanceof GraphRewriteException)) throw e;
+        if (selectedEdges.value.length > 0) {
+          for (const e of selectedEdges.value) {
+            gops.toggleEdgeColor(e);
           }
-        }
-        for (const e of selectedEdges.value) {
-          gops.toggleEdgeColor(e);
+        } else {
+          toggleNodeColors();
         }
         recordAfterGraphMod("edit:toggle color");
         break;
@@ -693,13 +690,7 @@ const command = (code) => {
     switch (code) {
       case "r":
         recordBeforeGraphMod();
-        for (const n of selectedNodes.value) {
-          try {
-            grewrite.toggleNodeColor(n);
-          } catch (e) {
-            if (!(e instanceof GraphRewriteException)) throw e;
-          }
-        }
+        toggleNodeColors();
         recordAfterGraphMod("rewrite:toggle color");
         break;
       case "g":
@@ -930,6 +921,12 @@ const checkCanDoCommand = {
   }),
   rEdit: computed(() => {
     if (selectedEdges.value.length > 0) return true;
+    if (selectedNodes.value.length <= 0) {
+      for (const n of Object.keys(graphStore.nodes)) {
+        if (gops.isZOrXNode(n)) return true;
+      }
+      return false;
+    }
     for (const n of selectedNodes.value) {
       if (gops.isZOrXNode(n)) return true;
     }
@@ -947,6 +944,12 @@ const checkCanDoCommand = {
   clear: computed(() => Object.keys(graphStore.nodes).length >= 1),
   // Rewrite mode
   rRewrite: computed(() => {
+    if (selectedEdges.value.length <= 0 && selectedNodes.value.length <= 0) {
+      for (const n of Object.keys(graphStore.nodes)) {
+        if (gops.isZOrXNode(n)) return true;
+      }
+      return false;
+    }
     for (const n of selectedNodes.value) {
       if (grewrite.toggleNodeColorIsValid(n)) return true;
     }
@@ -1132,6 +1135,24 @@ const addNodeAngles = () => {
       gops.addAngle(n, panelStore.angleToAdd);
     }
   }
+};
+
+const toggleNodeColors = () => {
+  let nodes = selectedNodes.value;
+  if (nodes.length <= 0) {
+    nodes = Object.keys(graphStore.nodes).filter((n) => gops.isXNode(n));
+  }
+  if (nodes.length <= 0) {
+    nodes = Object.keys(graphStore.nodes);
+  }
+  for (const n of nodes) {
+    try {
+      grewrite.toggleNodeColor(n);
+    } catch (e) {
+      if (!(e instanceof GraphRewriteException)) throw e;
+    }
+  }
+  selectedNodes.value = nodes;
 };
 
 const cut = (nodes) => {
