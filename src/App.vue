@@ -20,6 +20,7 @@ import { serialize, deserialize } from "@/graphSerial.js";
 import { fromPyzxJson, toPyzxJson } from "@/graphConvertPyzx.js";
 import { GraphRewrite, GraphRewriteException } from "@/graphRewrite.js";
 import * as angles from "@/angles.js";
+import { SoundEffects } from "@/sound.js";
 
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
@@ -39,6 +40,8 @@ const undoStore = reactive(
       (inHistory ? `${graphSummary(data)}, ${name}` : graphSummary(data)),
   })
 );
+const sound = new SoundEffects(false);
+const soundEnabled = toRef(sound, "enabled");
 
 const selectedNodes = ref([]);
 const selectedEdges = ref([]);
@@ -124,6 +127,7 @@ const watchConfig = () => {
   watch(toRef(styleStore.view.grid, "visible"), saveConfig);
   watch(toRef(styleStore.view, "scalingObjects"), saveConfig);
   watch(styleStore.layout, saveConfig);
+  watch(soundEnabled, saveConfig);
 };
 const saveConfig = () => {
   const config = {
@@ -133,6 +137,7 @@ const saveConfig = () => {
     scaleNodes: styleStore.view.scalingObjects,
     forceLayout: styleStore.layout.forceLayout,
     fixBoundaries: styleStore.layout.fixBoundaries,
+    soundEffects: soundEnabled.value,
   };
   try {
     window.localStorage.setItem("zx-view-config", JSON.stringify(config));
@@ -158,6 +163,7 @@ const loadConfig = () => {
     scaleNodes,
     //forceLayout, // Don't load this setting because it changes node layouts
     fixBoundaries,
+    soundEffects,
   } = config;
   panelStore.rewriteMode = rewriteMode ?? panelStore.rewriteMode;
   styleStore.view.grid.visible = gridVisible ?? styleStore.view.grid.visible;
@@ -166,6 +172,7 @@ const loadConfig = () => {
   //styleStore.layout.forceLayout = forceLayout ?? styleStore.layout.forceLayout;
   styleStore.layout.fixBoundaries =
     fixBoundaries ?? styleStore.layout.fixBoundaries;
+  soundEnabled.value = soundEffects ?? soundEnabled.value;
 };
 
 // Catch key strokes
@@ -173,7 +180,7 @@ const keydown = (e) => {
   let used = false;
   const code = e.which || e.charCode || e.keyCode || 0;
   let k =
-    code < 32
+    code < 32 || code > 127
       ? e.code || e.key
       : e.shiftKey
       ? String.fromCharCode(code).toUpperCase()
@@ -879,12 +886,16 @@ const command = (code) => {
       case "open":
         open();
         break;
+      case "Backquote":
+        soundEnabled.value = !soundEnabled.value;
+        break;
       default:
         used = false;
         break;
     }
   }
   if (used) {
+    sound.action(code);
     // Hack
     // When the graph is modified and the last-pressed button becomes disabled,
     // the button stops sending keydown events and all keyboard shortcuts stop
@@ -1042,6 +1053,7 @@ const checkCanDoCommand = {
   realign: ref(true),
   save: ref(true),
   open: ref(true),
+  Backquote: ref(true),
 };
 
 // Graph edit commands that adjust or use the selections before operating on the
@@ -1162,7 +1174,7 @@ const toggleNodeColors = () => {
     nodes = Object.keys(graphStore.nodes).filter((n) => gops.isXNode(n));
   }
   if (nodes.length <= 0) {
-    nodes = Object.keys(graphStore.nodes);
+    nodes = Object.keys(graphStore.nodes).filter((n) => gops.isZNode(n));
   }
   for (const n of nodes) {
     try {
