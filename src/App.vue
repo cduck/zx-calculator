@@ -18,7 +18,7 @@ import { UndoHistory } from "@/undo.js";
 import { GraphOps } from "@/graphOps.js";
 import { serialize, deserialize } from "@/graphSerial.js";
 import { fromPyzxJson, toPyzxJson } from "@/graphConvertPyzx.js";
-import { GraphRewrite } from "@/graphRewrite.js";
+import { GraphRewrite, GraphRewriteException } from "@/graphRewrite.js";
 import * as angles from "@/angles.js";
 
 const panelStore = usePanelStore();
@@ -205,6 +205,9 @@ const keydown = (e) => {
         used = command("Redo");
       } else if (k === "a" && !e.shiftKey) {
         used = command("selectAll");
+      } else if (k === "s" && !e.shiftKey) {
+        save();
+        used = true;
       }
     }
   }
@@ -220,9 +223,11 @@ const dragEnterHandler = (e) => {
     e.target instanceof HTMLTextAreaElement ||
     modalVisible.value
   ) {
+    e.dataTransfer.dropEffect = "none";
+    e.preventDefault();
     return;
   }
-  e.dataTransfer.effectAllowed = "copy";
+  e.dataTransfer.dropEffect = "copy";
   dragOverlayVisible.value = true;
   e.preventDefault();
   e.stopPropagation();
@@ -233,6 +238,7 @@ const dragOverHandler = (e) => {
     e.target instanceof HTMLTextAreaElement ||
     modalVisible.value
   ) {
+    e.preventDefault();
     return;
   }
   dragOverlayVisible.value = true;
@@ -245,6 +251,8 @@ const dragLeaveHandler = (e) => {
     e.target instanceof HTMLTextAreaElement ||
     modalVisible.value
   ) {
+    dragOverlayVisible.value = false;
+    e.preventDefault();
     return;
   }
   dragOverlayVisible.value = false;
@@ -255,8 +263,11 @@ const pasteOrDropHandler = (e) => {
   if (
     e.target instanceof HTMLInputElement ||
     e.target instanceof HTMLTextAreaElement ||
+    panelStore.rewriteMode ||
     modalVisible.value
   ) {
+    dragOverlayVisible.value = false;
+    e.preventDefault();
     return;
   }
   dragOverlayVisible.value = false;
@@ -291,7 +302,7 @@ const pasteDataTransfer = (dataTransfer) => {
           gotContent = true;
           break;
         }
-      } else if (item.type.match(/^text\/uri-list(\+|$)/)) {
+      } else if (item.type.match(/^text\/uri-list/)) {
         // Content is (multiple) URLs with #comments
         item.getAsString((uris) => {
           for (let uri of uris.split("\n")) {
@@ -303,7 +314,7 @@ const pasteDataTransfer = (dataTransfer) => {
         });
         gotContent = true;
         break;
-      } else if (item.type.match(/^text\/html(\+|$)/)) {
+      } else if (item.type.match(/^text\/html/)) {
         // Content is an HTML link
         item.getAsString((html) => {
           // Extract link from the first anchor in the HTML
@@ -317,7 +328,7 @@ const pasteDataTransfer = (dataTransfer) => {
         });
         gotContent = true;
         break;
-      } else if (item.type.match(/^(text\/plain|application\/json)(\+|$)/)) {
+      } else if (item.type.match(/^(text\/plain|application\/json)/)) {
         // Content is plain text
         item.getAsString((text) => {
           paste(text);
@@ -336,14 +347,17 @@ const copyOrCutHandler = (e) => {
     e.target instanceof HTMLTextAreaElement ||
     modalVisible.value
   ) {
+    e.preventDefault();
     return;
   }
   if (panelStore.rewriteMode && e.type === "cut") {
     // Don't cut in rewrite mode
+    e.preventDefault();
     return;
   }
   if (selectedNodes.value.length <= 0) {
     // No nodes to copy
+    e.preventDefault();
     return;
   }
   const dataTransfer = e.clipboardData || e.dataTransfer;
@@ -355,15 +369,15 @@ const copyOrCutHandler = (e) => {
   } else {
     copyData = copy(selectedNodes.value);
   }
-  const { str, title } = copyData;
-  const strWithComment = `#${title}\n${str}`;
+  const { url, title } = copyData;
+  const strWithComment = `#${title}\n${url}`;
   const aTag = document.createElement("a");
-  aTag.href = str;
+  aTag.href = url;
   aTag.innerText = title;
   const strWithHtml = aTag.outerHTML;
   dataTransfer.items.add(strWithComment, "text/uri-list");
   dataTransfer.items.add(strWithHtml, "text/html");
-  dataTransfer.items.add(str, "text/plain");
+  dataTransfer.items.add(url, "text/plain");
   e.preventDefault();
   e.stopPropagation();
 };
@@ -1134,11 +1148,11 @@ const copy = (nodes) => {
     paste.pasteContent = copyStr;
     paste.pasteCount = 1;
   }
-  const numNodes = Object.keys(nodes).length;
+  const numNodes = nodes.length;
   let numEdges = 0;
   gops.forInnerEdgesOfNodes(nodes, () => (numEdges += 1));
   return {
-    str: copyStr,
+    url: copyStr,
     title: `ZX Diagram with ${numNodes} node${
       numNodes === 1 ? "" : "s"
     } and ${numEdges} edge${numEdges === 1 ? "" : "s"}`,
@@ -1247,6 +1261,12 @@ const importPyzx = (str) => {
 };
 
 const pyzxJsonStr = ref("");
+const pyzxJsonFname = ref("");
+const saveFname = () => {
+  const numNodes = Object.keys(graphStore.nodes).length;
+  const numEdges = Object.keys(graphStore.edges).length;
+  return `zx-graph-${numNodes}n-${numEdges}e.pyzx.json`;
+};
 const exportPyzx = () => {
   updateNodesMaybeMoved();
   pyzxJsonStr.value = toPyzxJson(
@@ -1254,6 +1274,35 @@ const exportPyzx = () => {
     undefined,
     styleStore.layout.distance
   );
+  pyzxJsonFname.value = saveFname();
+};
+const save = () => {
+  updateNodesMaybeMoved();
+  const pyzxJson = toPyzxJson(
+    graphStore,
+    undefined,
+    styleStore.layout.distance
+  );
+  const fname = saveFname();
+  if (!pyzxJson) {
+    return;
+  }
+  const file = new Blob([pyzxJson], {
+    type: "application/json",
+  });
+  const blobUrl = URL.createObjectURL(file);
+  try {
+    const aTag = document.createElement("a");
+    aTag.download = fname;
+    aTag.rel = "noopener";
+    aTag.target = "_blank";
+    aTag.href = blobUrl;
+    aTag.dispatchEvent(new MouseEvent("click"));
+  } catch (e) {
+    console.error("Error saving graph to file:", e.message || e);
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  }
 };
 
 const svgOutStrGet = () => {
@@ -1333,6 +1382,7 @@ const getAsSvg = (vgraph, permalink) => {
       @importPyzx="importPyzx"
       @exportPyzx="exportPyzx"
       :pyzxJsonOutStr="pyzxJsonStr"
+      :pyzxJsonOutFname="pyzxJsonFname"
       :svgOutStrGet="svgOutStrGet"
       v-model:importErrorMsg="importErrorMsg"
       v-model:modalVisible="modalVisible"

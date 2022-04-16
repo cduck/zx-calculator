@@ -159,6 +159,7 @@ const saveImage = () => {
 const props = defineProps({
   checkCanDoCommand: Object,
   pyzxJsonOutStr: String,
+  pyzxJsonOutFname: String,
   svgOutStrGet: Function,
   importErrorMsg: String,
   modalVisible: Boolean,
@@ -261,6 +262,7 @@ watch(
                 class="btn"
                 :href="oldSaveImageUrl"
                 target="_blank"
+                rel="noopener"
                 @click="saveImage()"
               >
                 <ElButton :icon="Camera" title="Screenshot" />
@@ -740,7 +742,7 @@ watch(
       <a
         class="btn"
         :href="savePyzxJsonExportLink()"
-        download="zx-calculator.pyzx.json"
+        :download="pyzxJsonOutFname"
         style="margin-left: 12px"
       >
         <ElButton
@@ -946,7 +948,7 @@ a.btn {
 }
 
 .dragover-box {
-  background-color: rgba(64, 158, 255, 0.1);
+  background-color: rgba(64, 158, 255, 0.05);
   border: 2px dashed #409eff;
   border-radius: 6px;
   pointer-events: none;
