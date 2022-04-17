@@ -1,6 +1,7 @@
 <script setup>
 defineProps({
   visible: Boolean,
+  noPad: Boolean,
 });
 const emit = defineEmits(["update:visible"]);
 </script>
@@ -14,7 +15,10 @@ const emit = defineEmits(["update:visible"]);
     >
       <div class="modal-mid">
         <div class="modal-before"></div>
-        <div class="modal-inner" @click="(e) => e.stopPropagation()">
+        <div
+          :class="{ 'modal-inner': true, 'no-pad': noPad }"
+          @click="(e) => e.stopPropagation()"
+        >
           <slot />
         </div>
         <div class="modal-after"></div>
@@ -54,6 +58,10 @@ const emit = defineEmits(["update:visible"]);
   background-color: rgba(255, 255, 255, 0.8);
   border-radius: 8px;
   box-shadow: 0 1.5px 9px rgba(0, 0, 0, 0.3);
+  overflow: clip;
+}
+.modal-inner.no-pad {
+  padding: 0;
 }
 
 /* Panel transitions */
@@ -66,6 +74,6 @@ const emit = defineEmits(["update:visible"]);
 .modal-fade-enter-from,
 .modal-fade-leave-to {
   opacity: 0;
-  transform: scale(1.0) translateY(-10px);
+  transform: scale(1) translateY(-10px);
 }
 </style>

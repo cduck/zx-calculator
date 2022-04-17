@@ -22,6 +22,7 @@ import {
   Grid,
 } from "@element-plus/icons-vue";
 import ModalOverlay from "@/components/ModalOverlay.vue";
+import TheDocumentationPage from "@/components/TheDocumentationPage.vue";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
 import { version, versionKind } from "@/version.js";
@@ -780,11 +781,8 @@ watch(
     </div>
   </ModalOverlay>
   <!-- Help Page -->
-  <ModalOverlay v-model:visible="helpVisible">
-    <div style="text-align: center; width: calc(80vw + 20px)">
-      <h3 style="margin-top: 6px; margin-bottom: 10px">ZX Calculator — Help</h3>
-    </div>
-    <p><a href="https://zxcalculus.com/" target="_blank">zxcalculus.com</a></p>
+  <ModalOverlay v-model:visible="helpVisible" :noPad="true">
+    <TheDocumentationPage />
   </ModalOverlay>
 </template>
 
