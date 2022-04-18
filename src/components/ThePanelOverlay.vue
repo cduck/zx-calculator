@@ -704,7 +704,7 @@ watch(
   <!-- Pop-up views that cover the screen -->
   <!-- Import Graph -->
   <ModalOverlay v-model:visible="importVisible">
-    <div style="text-align: center; width: calc(80vw + 20px)">
+    <div class="import-export">
       <ElUpload
         drag
         accept=".json,application/json,text/json,.txt,text/plain"
@@ -739,7 +739,7 @@ watch(
   </ModalOverlay>
   <!-- Export Graph -->
   <ModalOverlay v-model:visible="exportVisible">
-    <div style="text-align: center; width: calc(80vw + 20px)">
+    <div class="import-export">
       <div style="margin-top: 6px; margin-bottom: 10px">
         Permalink:
         <a :href="theUrl" :innerText="abbreviateStr(theUrl)"></a>
@@ -975,6 +975,16 @@ a.btn {
   border: 2px dashed #409eff;
   border-radius: 6px;
   pointer-events: none;
+}
+
+.import-export {
+  text-align: center;
+  width: calc(100vw - 200px);
+}
+@media (min-width: 1060px) {
+  .import-export {
+    width: calc(860px);
+  }
 }
 </style>
 
