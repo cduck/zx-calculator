@@ -48,6 +48,7 @@ const selectedEdges = ref([]);
 const markedNodes = ref({ a: [], b: [] });
 
 const modalVisible = ref(false);
+const helpVisible = ref(false);
 
 // Disable overlay panels while panning
 const overlayInactive = ref(false);
@@ -114,9 +115,12 @@ onMounted(() => {
   styleStore.graph.svg.addEventListener("dragover", dragOverHandler);
   styleStore.graph.svg.addEventListener("dragleave", dragLeaveHandler);
   styleStore.graph.svg.addEventListener("drop", pasteOrDropHandler);
+  if (!window.location.hash) {
+    helpVisible.value = true;
+  }
   undoStore.load();
   if (undoStore.isEmpty()) {
-    undoStore.insertEntry(makeFullGraphStateCopy(), "init");
+    undoStore.insertEntry(makeFullGraphStateCopy(), "init", 0, true);
   }
   wereNodesMoved.value = false;
 });
@@ -1513,6 +1517,7 @@ const getAsSvg = (vgraph, permalink) => {
       :svgOutStrGet="svgOutStrGet"
       v-model:importErrorMsg="importErrorMsg"
       v-model:modalVisible="modalVisible"
+      v-model:helpVisible="helpVisible"
       :dragoverVisible="dragOverlayVisible"
     />
   </div>

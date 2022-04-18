@@ -69,7 +69,6 @@ const angleSuggestions = (query, callback) => {
 // Import and export
 const importVisible = ref(false);
 const exportVisible = ref(false);
-const helpVisible = ref(false);
 const pyzxJsonText = ref("");
 const theUrl = ref("");
 const exportCopyButtonLabel = ref("Copy");
@@ -166,6 +165,7 @@ const props = defineProps({
   svgOutStrGet: Function,
   importErrorMsg: String,
   modalVisible: Boolean,
+  helpVisible: Boolean,
   dragoverVisible: Boolean,
 });
 const emit = defineEmits([
@@ -175,18 +175,20 @@ const emit = defineEmits([
   "saveImageContent",
   "update:importErrorMsg",
   "update:modalVisible",
+  "update:helpVisible",
 ]);
 watch(toRef(props, "modalVisible"), (newVis) => {
   if (!newVis) {
-    importVisible.value = exportVisible.value = helpVisible.value = false;
+    importVisible.value = exportVisible.value = false;
+    emit("update:helpVisible", false);
   }
 });
 watch(
-  () => [importVisible.value, exportVisible.value, helpVisible.value],
+  () => [importVisible.value, exportVisible.value, props.helpVisible],
   () => {
     emit(
       "update:modalVisible",
-      importVisible.value || exportVisible.value || helpVisible.value
+      importVisible.value || exportVisible.value || props.helpVisible
     );
   }
 );
@@ -273,7 +275,7 @@ watch(
               <ElButton
                 class="btn"
                 :icon="Reading"
-                @click="helpVisible = !helpVisible"
+                @click="emit('update:helpVisible', !helpVisible)"
                 title="Documentation"
               />
             </div>
