@@ -44,7 +44,40 @@ const oneAsEmpty = (v) => (v === 1 ? "" : v);
 
 const splitNoEmpty = (str, div) => (str ? str.split(div) : []);
 
-export const serialize = (data, subgraphNodes) => {
+export const serializeAll = (data, snapshots) => {
+  if (snapshots && snapshots.length) {
+    const obj = {};
+    obj.g = serialize(data, undefined, true);
+    obj.s = [];
+    for (const snap of snapshots) {
+      obj.s.push(snap?.label ?? "");
+      obj.s.push(serialize(snap, undefined, true));
+    }
+    return JSON.stringify(obj);
+  } else {
+    return serialize(data);
+  }
+};
+
+export const deserializeAll = (str, ignoreSnapshots) => {
+  if (!str.startsWith('{"')) {
+    return { g: deserialize(str) };
+  } else {
+    const obj = JSON.parse(str);
+    const ret = { g: deserialize(obj.g) };
+    if (!ignoreSnapshots && obj.s && obj.s[0] !== undefined && obj.s.length) {
+      ret.s = [];
+      for (let i = 0; i + 1 < obj.s.length; i += 2) {
+        const graph = deserialize(obj.s[i + 1]);
+        graph.label = `${obj.s[i]}`;
+        ret.s.push(graph);
+      }
+    }
+    return ret;
+  }
+};
+
+export const serialize = (data, subgraphNodes, noOuterBracket) => {
   if (!data || !data.nodes) {
     return "";
   }
@@ -239,9 +272,11 @@ export const serialize = (data, subgraphNodes) => {
   const version = "0";
   const flags = "";
   if (version === "0" && !flags) {
-    return `{${graphStr}}`;
+    return noOuterBracket ? graphStr : `{${graphStr}}`;
   }
-  return `{${version}${flags}:${graphStr}}`;
+  return noOuterBracket
+    ? `${version}${flags}:${graphStr}`
+    : `{${version}${flags}:${graphStr}}`;
 };
 
 export const deserialize = (str, idPrefix, offsetX, offsetY) => {

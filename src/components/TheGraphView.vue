@@ -111,7 +111,6 @@ const emit = defineEmits([
     :event-handlers="eventHandlers"
     ref="graphElem"
   />
-  <div class="test"></div>
 </template>
 
 <style scoped>

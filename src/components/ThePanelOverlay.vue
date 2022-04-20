@@ -2,6 +2,7 @@
 import { ref, toRef, watch } from "vue";
 import {
   ElInput,
+  ElIcon,
   ElButton,
   ElButtonGroup,
   ElSwitch,
@@ -20,8 +21,10 @@ import {
   FullScreen,
   Rank,
   Grid,
+  CircleClose,
 } from "@element-plus/icons-vue";
 import ModalOverlay from "@/components/ModalOverlay.vue";
+import GraphPreview from "@/components/GraphPreview.vue";
 import TheDocumentationPage from "@/components/TheDocumentationPage.vue";
 import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
@@ -158,8 +161,72 @@ const saveImage = () => {
   oldSaveImageUrl.value = URL.createObjectURL(file);
 };
 
+// Snapshot logic
+const scrollToLastSnapshot = (el, instant) => {
+  const w = 300 * props.snapshotGraphs.length;
+  window.setTimeout(() =>
+    el.scrollTo({
+      left: w,
+      behavior: instant ? "instant" : "smooth",
+    })
+  );
+};
+const snapshotBeforeLeave = (el) => {
+  el.style.left = `${el.offsetLeft}px`;
+};
+const snapshotLeave = (el) => {
+  el.style.left = `${el.offsetLeft - 158}px`;
+};
+// Vue directives v-focus, v-scroll-snapshot, and v-scroll-parent
+const vFocus = {
+  // Delay focus until after enter animation
+  mounted: (el) => {
+    const lastSnap = props.snapshotGraphs[props.snapshotGraphs.length - 1];
+    if (lastSnap.isNew) {
+      delete lastSnap.isNew;
+      window.setTimeout(() => {
+        el.focus();
+        el.select();
+      }, 300);
+    }
+  },
+};
+const vScrollSnapshot = {
+  // Animated scroll on page load
+  mounted: (el) => scrollToLastSnapshot(el, false),
+};
+const vScrollParent = {
+  mounted: (el) => scrollToLastSnapshot(el.parentElement),
+};
+const snapshotClick = (e, g) => {
+  emit("snapshotSelect", g);
+};
+const snapshotClose = (e, g) => {
+  emit("snapshotDelete", g);
+};
+const snapshotLabelKeypress = (e) => {
+  const code = e.code || e.key;
+  if (code === "Enter") {
+    e.target.blur();
+  }
+};
+const snapshotLabelChange = (e, g) => {
+  if (e.target.value === "Snapshot") e.target.value = "";
+  e.target.blur();
+  g.label = e.target.value;
+  emit("snapshotLabelChange", g);
+};
+const snapshotLabelBlur = (e) => {
+  if (e.target.value === "Snapshot") e.target.value = "";
+};
+const snapshotLabelFocus = (e) => {
+  if (e.target.value === "") e.target.value = "Snapshot";
+  e.target.select();
+};
+
 const props = defineProps({
   checkCanDoCommand: Object,
+  snapshotGraphs: Array,
   pyzxJsonOutStr: String,
   pyzxJsonOutFname: String,
   svgOutStrGet: Function,
@@ -170,6 +237,9 @@ const props = defineProps({
 });
 const emit = defineEmits([
   "command",
+  "snapshotSelect",
+  "snapshotLabelChange",
+  "snapshotDelete",
   "importPyzx",
   "exportPyzx",
   "saveImageContent",
@@ -225,65 +295,61 @@ watch(
             active-text="Rewrite"
             inactive-color="#eb0"
           />
-          <div class="btn-row-group">
-            <ElButtonGroup>
-              <ElButton
-                class="btn"
-                @click="emit('command', 'Undo')"
-                :disabled="!props.checkCanDoCommand.Undo.value"
-              >
-                Undo
-              </ElButton>
-              <ElButton
-                class="btn"
-                @click="emit('command', 'Redo')"
-                :disabled="!props.checkCanDoCommand.Redo.value"
-              >
-                Redo
-              </ElButton>
-            </ElButtonGroup>
-          </div>
-          <div class="panel-top-right">
-            <div class="btn-row-group">
-              <ElButtonGroup>
-                <ElButton
-                  @click="
-                    emit('update:importErrorMsg', '');
-                    importVisible = !importVisible;
-                  "
-                >
-                  Import
-                </ElButton>
-                <ElButton
-                  @click="
-                    emit('exportPyzx');
-                    exportVisible = !exportVisible;
-                  "
-                >
-                  Export
-                </ElButton>
-              </ElButtonGroup>
-              <a
-                class="btn"
-                :href="oldSaveImageUrl"
-                target="_blank"
-                rel="noopener"
-                @click="saveImage()"
-              >
-                <ElButton :icon="Camera" title="Screenshot" />
-              </a>
-              <ElButton
-                class="btn"
-                :icon="Reading"
-                @click="emit('update:helpVisible', !helpVisible)"
-                title="Documentation"
-              />
-            </div>
-            <div
-              class="version"
-              :innerText="`v${version} ${versionKind}`"
-            ></div>
-          </div>
+          <ElButtonGroup>
+            <ElButton
+              @click="emit('command', 'Undo')"
+              :disabled="!props.checkCanDoCommand.Undo.value"
+            >
+              Undo
+            </ElButton>
+            <ElButton
+              @click="emit('command', 'Redo')"
+              :disabled="!props.checkCanDoCommand.Redo.value"
+            >
+              Redo
+            </ElButton>
+          </ElButtonGroup>
+          <ElButton
+            @click="emit('command', 'snapshot')"
+            :disabled="!props.checkCanDoCommand.snapshot.value"
+          >
+            Snapshot
+          </ElButton>
+          <div style="flex-grow: 1; margin: 0"></div>
+          <ElButtonGroup>
+            <ElButton
+              @click="
+                emit('update:importErrorMsg', '');
+                importVisible = !importVisible;
+              "
+            >
+              Import
+            </ElButton>
+            <ElButton
+              @click="
+                emit('exportPyzx');
+                exportVisible = !exportVisible;
+              "
+            >
+              Export
+            </ElButton>
+          </ElButtonGroup>
+          <a
+            class="btn"
+            :href="oldSaveImageUrl"
+            target="_blank"
+            rel="noopener"
+            @click="saveImage()"
+          >
+            <ElButton :icon="Camera" title="Screenshot" />
+          </a>
+          <ElButton
+            class="btn"
+            :icon="Reading"
+            @click="emit('update:helpVisible', !helpVisible)"
+            title="Documentation"
+          />
+          <div class="version" :innerText="`v${version} ${versionKind}`"></div>
         </div>
       </div>
     </Transition>
@@ -699,7 +765,40 @@ watch(
 
     <!-- Bottom Panel -->
     <Transition name="panel-bottom">
-      <div class="panelx panel-bottom" v-show="show && false"><div></div></div>
+      <div class="panelx panel-bottom" v-show="show && snapshotGraphs.length">
+        <div class="snapshot-container" v-scroll-snapshot>
+          <TransitionGroup
+            name="snapshot"
+            @before-leave="snapshotBeforeLeave"
+            @leave="snapshotLeave"
+          >
+            <div
+              v-for="g in snapshotGraphs"
+              :key="g"
+              class="snapshot"
+              v-scroll-parent
+            >
+              <ElButton class="snap-btn" @click="(e) => snapshotClick(e, g)">
+                <GraphPreview :zoomToFit="true" :graph="g" />
+              </ElButton>
+              <div class="snap-input">
+                <ElIcon @click="(e) => snapshotClose(e, g)">
+                  <CircleClose />
+                </ElIcon>
+                <input
+                  v-model="g.label"
+                  placeholder="Snapshot"
+                  v-focus
+                  @keypress="(e) => snapshotLabelKeypress(e, g)"
+                  @change="(e) => snapshotLabelChange(e, g)"
+                  @blur="(e) => snapshotLabelBlur(e, g)"
+                  @focus="(e) => snapshotLabelFocus(e, g)"
+                />
+              </div>
+            </div>
+          </TransitionGroup>
+        </div>
+      </div>
     </Transition>
   </div>
 
@@ -783,7 +882,11 @@ watch(
     </div>
   </ModalOverlay>
   <!-- Help Page -->
-  <ModalOverlay v-model:visible="helpVisible" :noPad="true">
+  <ModalOverlay
+    :visible="helpVisible"
+    @update:visible="(v) => emit('update:helpVisible', v)"
+    :noPad="true"
+  >
     <TheDocumentationPage />
   </ModalOverlay>
 </template>
@@ -793,7 +896,7 @@ watch(
   --left-width: 180px;
   --right-width: 180px;
   --top-height: 42px;
-  --bottom-height: 42px;
+  --bottom-height: 180px;
 }
 
 /* Panel grid and placement */
@@ -811,7 +914,9 @@ watch(
   top: 0;
   left: 0;
   width: 100vw;
+  max-width: 100vw;
   height: 100vh;
+  max-height: 100vh;
   pointer-events: none;
 }
 .panel-top {
@@ -851,7 +956,8 @@ watch(
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
 }
 .panelx > div {
-  width: 100%;
+  min-width: 100%;
+  width: 0;
   height: 100%;
 }
 .panely > div {
@@ -918,14 +1024,15 @@ watch(
 /* Panel content */
 .panelx > div {
   overflow: scroll;
+  overflow-y: hide;
   display: flex;
   flex-direction: row;
   justify-content: left;
   align-items: center;
-  white-space: nowrap;
+  gap: 8px;
 }
-.panelx > div > *:not(:last-child) {
-  margin-right: 16px;
+.panelx > div * {
+  flex-shrink: 0;
 }
 .panely > div {
   overflow: scroll;
@@ -960,16 +1067,91 @@ watch(
 a.btn {
   text-decoration: none;
 }
-.panelx > div > .panel-top-right {
-  height: 100%;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  flex-grow: 1;
-}
 .version {
   color: #999;
-  margin-left: 1em;
+}
+
+.snapshot-move,
+.snapshot-enter-active,
+.snapshot-leave-active {
+  transition-property: opacity, transform;
+  transition-duration: 0.3s;
+  transition-timing-function: ease-out;
+}
+.snapshot-enter-from,
+.snapshot-leave-to {
+  opacity: 0;
+}
+.snapshot-leave-to {
+  transform: translateY(-100px);
+}
+.snapshot-leave-active {
+  position: absolute;
+}
+.snapshot-container {
+  overflow: scroll;
+  overflow-y: hide;
+  overflow-x: scroll;
+}
+.snapshot {
+  width: 150px;
+}
+.snapshot .snap-btn {
+  width: 150px;
+  height: 150px;
+  padding: 0;
+}
+.snapshot .snap-input {
+  margin-top: 2px;
+  display: flex;
+  flex-direction: row;
+}
+.snapshot:hover .snap-input .el-icon {
+  color: #a8abb2;
+}
+.snapshot .snap-input .el-icon:hover,
+.snapshot .snap-input .el-icon:focus {
+  color: #606266;
+}
+.snapshot .snap-input .el-icon:active {
+  color: #409eff;
+}
+.snapshot .snap-input .el-icon {
+  color: transparent;
+  height: 18px;
+  width: 18px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: all;
+}
+.snapshot .snap-input input {
+  color: #303133;
+  border: none;
+  outline: none;
+  border-radius: 2px;
+  text-align: center;
+  background-color: transparent;
+  height: 18px;
+  width: calc(150px - 2 * 18px);
+  margin: 0;
+}
+.snapshot .snap-input input::placeholder {
+  color: #606266;
+  opacity: 1;
+}
+.snapshot .snap-input input:hover {
+  border: none;
+  outline: none;
+  box-shadow: rgb(192, 196, 204) 0px 0px 0px 1px inset;
+}
+.snapshot .snap-input input:focus {
+  border: none;
+  outline: none;
+  box-shadow: rgb(64, 158, 255) 0px 0px 0px 1px inset;
 }
 
 .dragover-box {

@@ -16,7 +16,12 @@ import { useStyleStore } from "@/stores/graphStyle.js";
 import { useGraphStore } from "@/stores/graph.js";
 import { UndoHistory } from "@/undo.js";
 import { GraphOps } from "@/graphOps.js";
-import { serialize, deserialize } from "@/graphSerial.js";
+import {
+  serialize,
+  deserialize,
+  serializeAll,
+  deserializeAll,
+} from "@/graphSerial.js";
 import { fromPyzxJson, toPyzxJson } from "@/graphConvertPyzx.js";
 import { GraphRewrite, GraphRewriteException } from "@/graphRewrite.js";
 import * as angles from "@/angles.js";
@@ -33,13 +38,15 @@ const undoStore = reactive(
   new UndoHistory({
     maxHistory: 0,
     linkToBrowser: true,
-    serialize: serialize,
-    deserialize: deserialize,
+    serialize: (data) => serializeWithSnapshots(data),
+    deserialize: (str, clear) => deserializeIgnoreSnapshots(str, clear),
     title: (data, name, inHistory) =>
       "ZX Calculator — " +
       (inHistory ? `${graphSummary(data)}, ${name}` : graphSummary(data)),
   })
 );
+let snapshotI = 0;
+const snapshotGraphs = ref(reactive([]));
 const sound = new SoundEffects(false);
 const soundEnabled = toRef(sound, "enabled");
 
@@ -552,9 +559,33 @@ const recordBeforeGraphMod = () => {
     wereNodesMoved.value = false;
   }
 };
-const recordAfterGraphMod = (name) => {
-  undoStore.addEntry(makeFullGraphStateCopy(true), name);
+const recordAfterGraphMod = (name, data) => {
+  data = data ?? makeFullGraphStateCopy(true);
+  undoStore.addEntry(data, name);
   wereNodesMoved.value = false;
+};
+const appendSnapshot = (data) => {
+  data.label = "";
+  data.id = `snapshot${snapshotI}`;
+  data.isNew = true;
+  snapshotI += 1;
+  snapshotGraphs.value.push(data);
+  undoStore.updateUrl();
+};
+const snapshotSelect = (g) => {
+  recordBeforeGraphMod();
+  graphStateFullReplace(g);
+  recordAfterGraphMod("restore snapshot" + (g.label ? ` (${g.label})` : ""), g);
+};
+const snapshotLabelChange = () => {
+  undoStore.updateUrl();
+};
+const snapshotDelete = (g) => {
+  const len = snapshotGraphs.value.length;
+  snapshotGraphs.value = snapshotGraphs.value.filter((item) => item !== g);
+  if (snapshotGraphs.value.length !== len) {
+    undoStore.updateUrl();
+  }
 };
 const edgeMultiClick = (detail) => {
   document.activeElement.blur();
@@ -849,6 +880,9 @@ const command = (code) => {
     used = true;
     // All modes
     switch (code) {
+      case "snapshot":
+        appendSnapshot(makeFullGraphStateCopy());
+        break;
       case "fitView":
         zoomToFit();
         break;
@@ -1044,6 +1078,7 @@ const checkCanDoCommand = {
       ? checkCanDoCommand.rRewrite
       : checkCanDoCommand.rEdit
   ),
+  snapshot: computed(() => Object.keys(graphStore.nodes).length >= 1),
   Escape: computed(
     () => selectedNodes.value.length > 0 || selectedEdges.value.length > 0
   ),
@@ -1359,6 +1394,22 @@ const splitNodes = (useX) => {
 };
 
 // Import and export graph
+const serializeWithSnapshots = (data) => {
+  return serializeAll(data, snapshotGraphs.value);
+};
+const deserializeIgnoreSnapshots = (str, clear) => {
+  const { g, s } = deserializeAll(str, !clear);
+  if (!clear && snapshotGraphs.value.length > 0) {
+    // Write the current list of snapshots into any URL you visit
+    undoStore.updateUrl(g);
+  }
+  // Only load snapshots on load/clear
+  if (clear) {
+    snapshotGraphs.value = s || [];
+  }
+  return g;
+};
+
 const importErrorMsg = ref("");
 const importPyzx = (str) => {
   let data;
@@ -1510,6 +1561,10 @@ const getAsSvg = (vgraph, permalink) => {
     <ThePanelOverlay
       :checkCanDoCommand="checkCanDoCommand"
       @command="command"
+      :snapshotGraphs="snapshotGraphs"
+      @snapshotSelect="snapshotSelect"
+      @snapshotLabelChange="snapshotLabelChange"
+      @snapshotDelete="snapshotDelete"
       @importPyzx="importPyzx"
       @exportPyzx="exportPyzx"
       :pyzxJsonOutStr="pyzxJsonStr"

@@ -140,7 +140,9 @@ export class UndoHistory {
     }
     let data;
     try {
-      data = this.deserialize ? this.deserialize(serial) : JSON.parse(serial);
+      data = this.deserialize
+        ? this.deserialize(serial, clearLocalHistory)
+        : JSON.parse(serial);
     } catch (e) {
       console.error("Graph parse from URL failed:", e.message || e);
       return;
@@ -176,6 +178,21 @@ export class UndoHistory {
       }
       document.title = title;
     }
+  }
+
+  updateUrl(data) {
+    let name, fingerprint;
+    if (data || this.outOfHistory) {
+      data = data ?? this.outOfHistory;
+      name = "update";
+      fingerprint = this._nextFingerprint();
+    } else {
+      const h = this.history[this.currentIndex];
+      data = h.data;
+      name = h.name;
+      fingerprint = h.fingerprint;
+    }
+    this._pushBrowserHistory(data, name, fingerprint, true);
   }
 
   addEntry(dataCopy, name) {
