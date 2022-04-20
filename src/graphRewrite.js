@@ -498,13 +498,15 @@ export class GraphRewrite {
       nodeX = leftX + 24;
       nodeY = leftY - 24;
       rightX = nodeX;
-      rightY = nodeY - 24;
+      rightY = nodeY - 48;
     }
     // Add and move nodes
     const split = this.graphOps.addNode(
       this.graphOps.nodeType(node),
       leftX,
-      leftY
+      leftY,
+      undefined,
+      true
     );
     const newNode = this.graphOps.addNode(newNodeZxType, nodeX, nodeY);
     this.graphOps.setLocation(node, rightX, rightY);

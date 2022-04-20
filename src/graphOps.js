@@ -230,7 +230,7 @@ export class GraphOps {
   locationY(nodeId) {
     return this.graph.layouts.nodes[nodeId]?.y;
   }
-  setLocation(nodeId, x, y) {
+  setLocation(nodeId, x, y, forceLocation) {
     if (this.graph.layouts.nodes[nodeId]) {
       this.graph.layouts.nodes[nodeId] = {
         ...this.graph.layouts.nodes[nodeId],
@@ -239,6 +239,9 @@ export class GraphOps {
       };
     } else {
       this.graph.layouts.nodes[nodeId] = { x: x, y: y };
+    }
+    if (this.findBestNodePositions && !forceLocation) {
+      this.findBestNodePositions([nodeId]);
     }
   }
 
@@ -396,7 +399,7 @@ export class GraphOps {
   }
 
   ////////// Graph operations //////////
-  addNode(zxType, x, y, angle) {
+  addNode(zxType, x, y, angle, forceLocation) {
     assert(zxType, "required first argument");
     let nodeId = `node${this.nextNodeIndex}`;
     while (this.graph.nodes[nodeId]) {
@@ -413,7 +416,7 @@ export class GraphOps {
     if (x !== undefined && y !== undefined) {
       this.graph.layouts.nodes[nodeId] = { x: x, y: y };
     }
-    if (this.findBestNodePositions) {
+    if (this.findBestNodePositions && !forceLocation) {
       this.findBestNodePositions([nodeId]);
     }
     return nodeId;
