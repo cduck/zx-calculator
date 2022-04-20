@@ -292,9 +292,12 @@ const pasteOrDropHandler = (e) => {
   if (
     e.target instanceof HTMLInputElement ||
     e.target instanceof HTMLTextAreaElement ||
-    panelStore.rewriteMode ||
     modalVisible.value
   ) {
+    dragOverlayVisible.value = false;
+    return;
+  }
+  if (panelStore.rewriteMode) {
     dragOverlayVisible.value = false;
     e.preventDefault();
     return;
@@ -376,7 +379,6 @@ const copyOrCutHandler = (e) => {
     e.target instanceof HTMLTextAreaElement ||
     modalVisible.value
   ) {
-    e.preventDefault();
     return;
   }
   if (panelStore.rewriteMode && e.type === "cut") {
