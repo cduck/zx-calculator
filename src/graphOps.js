@@ -7,6 +7,7 @@ import {
   isPiDivN2,
   ANGLE_PI,
 } from "@/angles.js";
+import { AnimationSpec } from "@/graphAnimation.js";
 
 // Graph exceptions
 export function GraphOperationException(msg) {
@@ -23,12 +24,12 @@ export const assert = (condition, msg) => {
 };
 
 const TOGGLE_EDGE_MAP = {
-  "hadamard": "normal",
-  "normal": "hadamard",
+  hadamard: "normal",
+  normal: "hadamard",
 };
 const TOGGLE_NODE_MAP = {
-  "z": "x",
-  "x": "z",
+  z: "x",
+  x: "z",
 };
 
 export class GraphOps {
@@ -44,6 +45,12 @@ export class GraphOps {
     this.nextNodeIndex = Object.keys(this.graph.nodes).length + 1;
     this.nextEdgeIndex = Object.keys(this.graph.edges).length + 1;
     this.nextPathIndex = Object.keys(this.graph.paths).length + 1;
+    this.animSpec = new AnimationSpec();
+  }
+
+  ////////// Logging for animation //////////
+  resetAnimationLog() {
+    this.animSpec = new AnimationSpec();
   }
 
   ////////// Graph tests //////////
@@ -231,7 +238,10 @@ export class GraphOps {
     return this.graph.layouts.nodes[nodeId]?.y;
   }
   setLocation(nodeId, x, y, forceLocation) {
+    let oldX, oldY;
     if (this.graph.layouts.nodes[nodeId]) {
+      oldX = this.graph.layouts.nodes[nodeId].x;
+      oldY = this.graph.layouts.nodes[nodeId].y;
       this.graph.layouts.nodes[nodeId] = {
         ...this.graph.layouts.nodes[nodeId],
         x: x,
@@ -242,6 +252,11 @@ export class GraphOps {
     }
     if (this.findBestNodePositions && !forceLocation) {
       this.findBestNodePositions([nodeId]);
+    }
+    if (oldX !== undefined && oldY !== undefined) {
+      const newX = this.graph.layouts.nodes[nodeId].x;
+      const newY = this.graph.layouts.nodes[nodeId].y;
+      this.animSpec.moveNode(nodeId, oldX, oldY, newX, newY);
     }
   }
 
@@ -399,7 +414,7 @@ export class GraphOps {
   }
 
   ////////// Graph operations //////////
-  addNode(zxType, x, y, angle, forceLocation) {
+  addNode(zxType, x, y, angle, forceLocation, oldX, oldY, addInstant) {
     assert(zxType, "required first argument");
     let nodeId = `node${this.nextNodeIndex}`;
     while (this.graph.nodes[nodeId]) {
@@ -412,6 +427,7 @@ export class GraphOps {
     };
     if (angle && !isZero(angle)) {
       this.graph.nodes[nodeId].zxAngle = angle;
+      this.animSpec.setAngle(nodeId, angle, angle, addInstant);
     }
     if (x !== undefined && y !== undefined) {
       this.graph.layouts.nodes[nodeId] = { x: x, y: y };
@@ -419,19 +435,51 @@ export class GraphOps {
     if (this.findBestNodePositions && !forceLocation) {
       this.findBestNodePositions([nodeId]);
     }
+    const newX = this.graph.layouts.nodes[nodeId].x;
+    const newY = this.graph.layouts.nodes[nodeId].y;
+    oldX = oldX ?? newX;
+    oldY = oldY ?? newY;
+    this.animSpec.addNode(nodeId, zxType, oldX, oldY, newX, newY, addInstant);
     return nodeId;
   }
-  addZNode(x, y, angle) {
-    return this.addNode("z", x, y, angle);
+  addZNode(x, y, angle, forceLocation, oldX, oldY, addInstant) {
+    return this.addNode(
+      "z",
+      x,
+      y,
+      angle,
+      forceLocation,
+      oldX,
+      oldY,
+      addInstant
+    );
   }
-  addXNode(x, y, angle) {
-    return this.addNode("x", x, y, angle);
+  addXNode(x, y, angle, forceLocation, oldX, oldY, addInstant) {
+    return this.addNode(
+      "x",
+      x,
+      y,
+      angle,
+      forceLocation,
+      oldX,
+      oldY,
+      addInstant
+    );
   }
-  addBoundaryNode(x, y, angle) {
-    return this.addNode("boundary", x, y, angle);
+  addBoundaryNode(x, y, angle, forceLocation, oldX, oldY, addInstant) {
+    return this.addNode(
+      "boundary",
+      x,
+      y,
+      angle,
+      forceLocation,
+      oldX,
+      oldY,
+      addInstant
+    );
   }
 
-  addEdge(n1, n2, zxType) {
+  addEdge(n1, n2, zxType, addInstant) {
     assert(zxType, "required third argument");
     let edgeId = `edge${this.nextEdgeIndex}`;
     while (this.graph.edges[edgeId]) {
@@ -447,13 +495,14 @@ export class GraphOps {
       target: n2,
       zxType: zxType,
     };
+    this.animSpec.addEdge(edgeId, n1, n2, zxType, addInstant);
     return edgeId;
   }
-  addNormalEdge(n1, n2) {
-    return this.addEdge(n1, n2, "normal");
+  addNormalEdge(n1, n2, addInstant) {
+    return this.addEdge(n1, n2, "normal", addInstant);
   }
-  addHadamardEdge(n1, n2) {
-    return this.addEdge(n1, n2, "hadamard");
+  addHadamardEdge(n1, n2, addInstant) {
+    return this.addEdge(n1, n2, "hadamard", addInstant);
   }
   toggleHadamardEdgeHandleSelfLoop(n1, n2, dontToggle) {
     // Find existing Hadamard edges
@@ -511,7 +560,7 @@ export class GraphOps {
 
   // If zxType is undefined, uses normal edges only to boundary nodes
   // If zxType, enforces this type for removed edges
-  toggleEdges(nodeIds, zxType) {
+  toggleEdges(nodeIds, zxType, noFade, removeInstant) {
     const allEdges = this.graph.edges;
     const oldEdgeIds = new Set();
     const oldNodePairs = new Set();
@@ -529,6 +578,7 @@ export class GraphOps {
       );
       // Remove existing edge
       delete this.graph.edges[edgeId];
+      this.animSpec.removeEdge(edgeId, noFade, removeInstant);
     });
     // Remove any dependent paths
     this.clearPathsByEdges(oldEdgeIds);
@@ -537,19 +587,19 @@ export class GraphOps {
       if (!oldNodePairs.has(this.nodePairString(n1, n2))) {
         // Add new edge
         if (zxType) {
-          this.addEdge(n1, n2, zxType);
+          this.addEdge(n1, n2, zxType, noFade);
         } else if (
           this.graph.nodes[n1].zxType === "boundary" ||
           this.graph.nodes[n2].zxType === "boundary"
         ) {
-          this.addNormalEdge(n1, n2);
+          this.addNormalEdge(n1, n2, noFade);
         } else {
-          this.addHadamardEdge(n1, n2);
+          this.addHadamardEdge(n1, n2, noFade);
         }
       }
     });
   }
-  clearEdgesBetweenNodes(nodeIds, zxType) {
+  clearEdgesBetweenNodes(nodeIds, zxType, noFade, removeInstant) {
     this.forInnerEdgesOfNodes(nodeIds, (edgeId) => {
       // Check matching edge type
       if (zxType && zxType !== this.graph.edges[edgeId].zxType) {
@@ -559,10 +609,11 @@ export class GraphOps {
       }
       // Remove existing edge
       delete this.graph.edges[edgeId];
+      this.animSpec.removeEdge(edgeId, noFade, removeInstant);
     });
   }
 
-  deleteEdges(edges, zxType) {
+  deleteEdges(edges, zxType, noFade, removeInstant) {
     // Remove any dependent paths
     this.clearPathsByEdges(edges);
     // Remove edges
@@ -571,28 +622,54 @@ export class GraphOps {
         throw new GraphOperationException("deleting edges of the wrong type");
       }
       delete this.graph.edges[edgeId];
+      this.animSpec.removeEdge(edgeId, noFade, removeInstant);
     }
   }
 
-  deleteNodes(nodes) {
+  deleteNodes(nodes, finalPositions, noFade, removeInstant) {
     const oldEdges = [];
     // Find and remove edges
     this.forEdgesOfNodes(nodes, (edgeId) => {
       oldEdges.push(edgeId);
       delete this.graph.edges[edgeId];
+      this.animSpec.removeEdge(edgeId, noFade, removeInstant);
     });
     // Remove any dependent paths
     this.clearPathsByEdges(oldEdges);
     // Remove nodes and node position info
     for (const nodeId of nodes) {
+      const [oldX, oldY] = this.locationXY(nodeId);
       delete this.graph.layouts.nodes[nodeId];
       delete this.graph.nodes[nodeId];
+      if (finalPositions?.[nodeId]) {
+        const newX = finalPositions[nodeId].x;
+        const newY = finalPositions[nodeId].y;
+        this.animSpec.removeNode(
+          nodeId,
+          oldX,
+          oldY,
+          newX,
+          newY,
+          noFade,
+          removeInstant
+        );
+      } else {
+        this.animSpec.removeNode(
+          nodeId,
+          oldX,
+          oldY,
+          oldX,
+          oldY,
+          noFade,
+          removeInstant
+        );
+      }
     }
   }
 
-  setAngle(nodeId, angle) {
-    // Allow casting comparison for "0"
-    if (angle && angle != 0) {
+  setAngle(nodeId, angle, setInstant, setAtEnd) {
+    const oldAngle = this.graph.nodes[nodeId].zxAngle;
+    if (angle && !isZero(angle)) {
       this.graph.nodes[nodeId] = {
         ...this.graph.nodes[nodeId],
         zxAngle: angle,
@@ -601,19 +678,20 @@ export class GraphOps {
       this.graph.nodes[nodeId] = { ...this.graph.nodes[nodeId] };
       delete this.graph.nodes[nodeId].zxAngle;
     }
+    this.animSpec.setAngle(nodeId, oldAngle, angle, setInstant, setAtEnd);
   }
 
-  addAngle(nodeId, a) {
+  addAngle(nodeId, a, setInstant, setAtEnd) {
     const old = this.angle(nodeId);
     if (old && old !== "0") {
       a = angleStrSum(old, a);
     }
-    this.setAngle(nodeId, a);
+    this.setAngle(nodeId, a, setInstant, setAtEnd);
   }
 
-  subtractAngle(nodeId, a) {
+  subtractAngle(nodeId, a, setInstant, setAtEnd) {
     const old = this.angle(nodeId);
-    this.setAngle(nodeId, angleStrDiff(old, a));
+    this.setAngle(nodeId, angleStrDiff(old, a), setInstant, setAtEnd);
   }
 
   // Remove all paths dependent on these edges or shared nodes

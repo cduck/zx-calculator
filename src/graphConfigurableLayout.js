@@ -2,7 +2,7 @@
 // Significantly modified from v-network-graph ForceLayout
 // https://github.com/dash14/v-network-graph/blob/0862692061da4a5d2ab212210e9f5f067621e4fb/src/layouts/force.ts
 
-import { toRef, watch } from "vue";
+import { toRef, watch, reactive } from "vue";
 import { Config } from "v-network-graph";
 import * as d3 from "d3-force";
 
@@ -14,7 +14,119 @@ const DEFAULT_OPTIONS = {
   forceLayout: true,
   fixBoundaries: true,
   positionFixedByClickWithAltKey: true, // Doesn't really work yet
+  animDuration: 300, // Milliseconds, used by GraphUpdateController
 };
+
+export class GraphUpdateController {
+  constructor(options, updateCallback) {
+    this.options = options;
+    for (const [k, v] of Object.entries(DEFAULT_OPTIONS)) {
+      if (this.options[k] === undefined) {
+        this.options[k] = v;
+      }
+    }
+    this.updateCallback = updateCallback;
+    this.animQueue = [];
+
+    this.displayGraph = {
+      nodes: reactive({}),
+      edges: reactive({}),
+      paths: reactive({}),
+      layouts: {
+        nodes: reactive({}),
+      },
+    };
+
+    this.targetGraph = {
+      nodes: {},
+      edges: {},
+      paths: {},
+      layouts: {
+        nodes: {},
+      },
+    };
+  }
+
+  updateGraph(data, animSpec) {
+    overwriteDict(this.targetGraph.nodes, data.nodes);
+    overwriteDict(this.targetGraph.edges, data.edges);
+    overwriteDict(this.targetGraph.paths, data.paths);
+    overwriteDict(this.targetGraph.layouts.nodes, data.layouts.nodes);
+
+    if (animSpec && animSpec.needsAnimation()) {
+      // Queue animation
+      console.log("animate", animSpec);
+      this.animQueue.push(animSpec);
+      if (this.animQueue.length === 1) {
+        // Start animation frames
+        this._startAnimation();
+      }
+    } else if (this.animQueue.length <= 0) {
+      // Update instantly
+      overwriteDict(this.displayGraph.nodes, data.nodes);
+      overwriteDict(this.displayGraph.edges, data.edges);
+      overwriteDict(this.displayGraph.paths, data.paths);
+      overwriteDict(this.displayGraph.layouts.nodes, data.layouts.nodes);
+      if (this.updateCallback) this.updateCallback();
+    }
+  }
+
+  cancelAnimation(newData) {
+    this.animQueue = [];
+    this.updateGraph(newData);
+  }
+
+  _startAnimation() {
+    const state = this.animQueue[0].getAnimationState(this.displayGraph);
+    state.applyAnimationStart();
+    if (this.updateCallback) this.updateCallback();
+    this._startRequestAnimationFrame(state);
+  }
+
+  _finishAnimation() {
+    overwriteDict(this.displayGraph.nodes, this.targetGraph.nodes);
+    overwriteDict(this.displayGraph.edges, this.targetGraph.edges);
+    overwriteDict(this.displayGraph.paths, this.targetGraph.paths);
+    overwriteDict(
+      this.displayGraph.layouts.nodes,
+      this.targetGraph.layouts.nodes
+    );
+    if (this.updateCallback) this.updateCallback();
+  }
+
+  _startRequestAnimationFrame(state) {
+    let startTime;
+    const duration = this.options.animDuration;
+    const callback = (timestamp) => {
+      if (this.animQueue.length <= 0) {
+        this._finishAnimation();
+        return;
+      }
+      if (startTime === undefined) {
+        startTime = timestamp;
+      }
+      const timeIn = timestamp - startTime;
+      if (timeIn < duration) {
+        state.applyAnimationStep(easeOut(timeIn, duration, 0, 1));
+      } else {
+        state.applyAnimationEnd();
+      }
+      if (this.updateCallback) this.updateCallback();
+
+      if (timeIn >= duration) {
+        this.animQueue.splice(0, 1);
+        if (this.animQueue.length <= 0) {
+          this._finishAnimation();
+        } else {
+          this._startAnimation();
+        }
+      } else {
+        window.requestAnimationFrame(callback);
+      }
+    };
+    window.requestAnimationFrame(callback);
+  }
+}
 
 export class ConfigurableLayout {
   constructor(options) {
@@ -135,8 +247,16 @@ export class ConfigurableLayout {
     );
   }
 
-  findBestNodePositions(nodeIds, forceGrid, allowOffPage) {
-    const { layouts, nodes, configs, scale, svgPanZoom } = this.getParameters();
+  findBestNodePositions(
+    nodeIds,
+    forceGrid,
+    allowOffPage,
+    otherLayouts,
+    otherNodes
+  ) {
+    let { layouts, nodes, configs, scale, svgPanZoom } = this.getParameters();
+    layouts = otherLayouts ?? layouts;
+    nodes = otherNodes ?? nodes.value;
     const area = svgPanZoom.getViewArea();
     const s = scale.value;
     const dist = this.options.grid;
@@ -147,7 +267,7 @@ export class ConfigurableLayout {
         withNoInitPos.push(nodeId);
         continue;
       }
-      const node = nodes.value[nodeId];
+      const node = nodes[nodeId];
       const nodeSize = getNodeSize(node, configs.node, s);
       const start = this.snapPosition(layouts[nodeId], forceDist);
       if (!allowOffPage) {
@@ -175,7 +295,7 @@ export class ConfigurableLayout {
         let collision = false;
         collide: for (const [id, pos] of Object.entries(layouts)) {
           if (nodeId === id) continue;
-          const targetNode = nodes.value[id];
+          const targetNode = nodes[id];
           if (!targetNode) continue;
           if (
             Math.abs(pos.x - candidate.x) < dist &&
@@ -197,14 +317,16 @@ export class ConfigurableLayout {
           break findPos;
         }
       }
-      const layout = this.getOrCreateNodePosition(layouts, nodeId);
-      this.setNodePosition(layout, candidate);
+      const pos = this.getOrCreateNodePosition(layouts, nodeId);
+      this.setNodePosition(pos, candidate);
     }
-    this.setNewNodePositions(withNoInitPos);
+    this.setNewNodePositions(withNoInitPos, layouts, nodes);
   }
 
-  setNewNodePositions(nodeIds) {
-    const { layouts, nodes, configs, scale, svgPanZoom } = this.getParameters();
+  setNewNodePositions(nodeIds, otherLayouts, otherNodes) {
+    let { layouts, nodes, configs, scale, svgPanZoom } = this.getParameters();
+    layouts = otherLayouts ?? layouts;
+    nodes = otherNodes ?? nodes.value;
     // Set the positions of newly added nodes
     const area = svgPanZoom.getViewArea();
     const s = scale.value;
@@ -217,14 +339,14 @@ export class ConfigurableLayout {
         continue;
       }
       // New node
-      const node = nodes.value[nodeId];
+      const node = nodes[nodeId];
       const nodeSize = getNodeSize(node, configs.node, s);
       const candidate = this.snapPosition({ ...area.center }, dist);
       findPos: for (;;) {
         let collision = false;
         collide: for (const [id, pos] of Object.entries(layouts)) {
           if (nodeId === id) continue;
-          const targetNode = nodes.value[id];
+          const targetNode = nodes[id];
           if (!targetNode) continue;
           const targetNodeSize = getNodeSize(targetNode, configs.node, s);
           if (areNodesCollision(candidate, nodeSize, pos, targetNodeSize)) {
@@ -244,8 +366,8 @@ export class ConfigurableLayout {
           break findPos;
         }
       }
-      const layout = this.getOrCreateNodePosition(layouts, nodeId);
-      this.setNodePosition(layout, candidate);
+      const pos = this.getOrCreateNodePosition(layouts, nodeId);
+      this.setNodePosition(pos, candidate);
     }
   }
 
@@ -285,7 +407,7 @@ export class ConfigurableLayout {
 
   getOrCreateNodePosition(layouts, node) {
     if (!layouts[node]) {
-      layouts[node] = { x: 0, y: 0, zxAngle: "?" };
+      layouts[node] = { x: 0, y: 0 };
     }
     return toRef(layouts, node);
   }
@@ -383,6 +505,33 @@ export class ConfigurableLayout {
       }));
   }
 }
+
+const easeOut = (time, duration, start, end) => {
+  start = start ?? end ?? undefined;
+  end = end ?? start;
+  if (start === end) {
+    return start;
+  }
+  if (!(time < duration) || duration <= 0) {
+    return end;
+  }
+  if (time < 0) {
+    return start;
+  }
+  const change = end - start;
+  let temp = time / duration - 1;
+  return start + change * (temp * temp * temp + 1);
+};
+
+const overwriteDict = (oldObj, newObj) => {
+  const oldKeys = Object.keys(oldObj);
+  Object.assign(oldObj, newObj);
+  for (const k of oldKeys) {
+    if (!(k in newObj)) {
+      delete oldObj[k];
+    }
+  }
+};
 
 // From https://github.com/dash14/v-network-graph/blob/main/src/utils/visual.ts
 const getNodeSize = (node, style, scale) => {

@@ -2,11 +2,18 @@ import { reactive } from "vue";
 import { defineStore } from "pinia";
 import { defineConfigs } from "v-network-graph";
 
-const green = "#cfc";
-const red = "#f88";
-const black = "#000";
-const hEdgeColor = "#08f";
-const errorColor = "#fa0";
+//const green = "#cfc";
+//const red = "#f88";
+//const black = "#000";
+//const white = "#fff";
+//const hEdgeColor = "#08f";
+//const errorColor = "#fa0";
+const greenOp = (opacity) => `rgba(204, 255, 204, ${opacity})`;
+const redOp = (opacity) => `rgba(255, 136, 136, ${opacity})`;
+const blackOp = (opacity) => `rgba(0, 0, 0, ${opacity})`;
+const whiteOp = (opacity) => `rgba(255, 255, 255, ${opacity})`;
+const hEdgeColorOp = (opacity) => `rgba(0, 136, 255, ${opacity})`;
+const errorColorOp = (opacity) => `rgba(255, 170, 0, ${opacity})`;
 
 const nodeConfig = {
   type: "circle",
@@ -25,12 +32,14 @@ const nodeConfig = {
       pivotA: 1.5,
     }[n.zxType] ?? 1.5),
   strokeColor: (n) =>
-    ({
-      z: black,
-      x: black,
-      boundary: black,
-      pivotA: hEdgeColor,
-    }[n.zxType] ?? black),
+    ((
+      {
+        z: blackOp,
+        x: blackOp,
+        boundary: blackOp,
+        pivotA: hEdgeColorOp,
+      }[n.zxType] ?? blackOp
+    )(n.opacity ?? 1)),
   strokeDasharray: (n) =>
     ({
       z: "0",
@@ -39,12 +48,14 @@ const nodeConfig = {
       pivotA: "4 1.027",
     }[n.zxType] ?? "4 3.854"),
   color: (n) =>
-    ({
-      z: green,
-      x: red,
-      boundary: black,
-      pivotA: "white",
-    }[n.zxType] ?? errorColor),
+    ((
+      {
+        z: greenOp,
+        x: redOp,
+        boundary: blackOp,
+        pivotA: whiteOp,
+      }[n.zxType] ?? errorColorOp
+    )(n.opacity ?? 1)),
 };
 
 const edgeConfig = {
@@ -54,10 +65,12 @@ const edgeConfig = {
       hadamard: 1.5,
     }[n.zxType] ?? 6),
   color: (n) =>
-    ({
-      normal: black,
-      hadamard: hEdgeColor,
-    }[n.zxType] ?? errorColor),
+    ((
+      {
+        normal: blackOp,
+        hadamard: hEdgeColorOp,
+      }[n.zxType] ?? errorColorOp
+    )(n.opacity ?? 1)),
   dasharray: (n) =>
     ({
       normal: "",
@@ -110,7 +123,7 @@ export const useStyleStore = defineStore("graphStyle", {
           fontFamily: undefined,
           fontSize: 11,
           lineHeight: 1.1,
-          color: black,
+          color: "black",
           margin: 4,
           direction: "north",
           background: {
@@ -179,6 +192,7 @@ export const useStyleStore = defineStore("graphStyle", {
         forceLayout: false,
         fixBoundaries: true,
         positionFixedByClickWithAltKey: false, // Doesn't really work yet
+        animDuration: 3000, // Milliseconds
       }),
       extra: reactive({
         zoomLevel: 1,

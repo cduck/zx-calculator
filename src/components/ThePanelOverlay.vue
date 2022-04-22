@@ -561,7 +561,7 @@ watch(
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Hadamard Cancellation:<br />Remove a Hadamard edge between degree-2 nodes [H]"
+            tooltip="Fusion:<br />Remove a normal edge between nodes of the same color [H]<br /><br />Hadamard Cancellation:<br />Remove a Hadamard edge between nodes of the same color (one node must have degree-2 and have a neighbor whose color matches the other node) [H]"
           >
             <ElButton
               class="btn btn100"
@@ -574,7 +574,7 @@ watch(
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Reverse Hadamard Cancellation:<br />Insert two Hadamard edges by adding two Z nodes [Shift+H or Shirt+G]"
+            tooltip="Reverse Hadamard Cancellation:<br />Insert two Hadamard edges by adding two Z (or X) nodes [Shift+H or Shift+G]"
           >
             <ElButton
               class="btn btn100"

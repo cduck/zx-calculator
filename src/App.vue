@@ -15,6 +15,7 @@ import { usePanelStore } from "@/stores/panels.js";
 import { useStyleStore } from "@/stores/graphStyle.js";
 import { useGraphStore } from "@/stores/graph.js";
 import { UndoHistory } from "@/undo.js";
+import { GraphUpdateController } from "@/graphConfigurableLayout.js";
 import { GraphOps } from "@/graphOps.js";
 import {
   serialize,
@@ -30,8 +31,17 @@ import { SoundEffects } from "@/sound.js";
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 const graphStore = useGraphStore();
+const graphUpdater = new GraphUpdateController(styleStore.layout, () =>
+  styleStore.view.layoutHandler.networkChanged()
+);
 const gops = new GraphOps(graphStore, (ns) =>
-  styleStore.view.layoutHandler.findBestNodePositions(ns)
+  styleStore.view.layoutHandler.findBestNodePositions(
+    ns,
+    undefined,
+    undefined,
+    gops.graph.layouts.nodes,
+    gops.graph.nodes
+  )
 );
 const grewrite = new GraphRewrite(gops);
 const undoStore = reactive(
@@ -435,7 +445,8 @@ const graphStateFullReplace = (data) => {
   selectedNodes.value = [];
   selectedEdges.value = [];
   graphStore.fullReplace(data);
-  styleStore.view.layoutHandler.networkChanged();
+  gops.resetAnimationLog();
+  graphUpdater.cancelAnimation(data);
   selectedNodes.value = (data?.selectedNodes ?? []).filter(
     (n) => graphStore.nodes[n]
   );
@@ -560,9 +571,12 @@ const recordBeforeGraphMod = () => {
     undoStore.insertEntry(makeFullGraphStateCopy(), "select nodes", 0, true);
     wereNodesMoved.value = false;
   }
+  gops.resetAnimationLog();
 };
 const recordAfterGraphMod = (name, data) => {
   data = data ?? makeFullGraphStateCopy(true);
+  graphUpdater.updateGraph(data, gops.animSpec);
+  gops.resetAnimationLog();
   undoStore.addEntry(data, name);
   wereNodesMoved.value = false;
 };
@@ -753,15 +767,25 @@ const command = (code) => {
         // Hadamard cancellation
         recordBeforeGraphMod();
         const newEdges = [];
+        const newNodes = [];
         for (const e of selectedEdges.value) {
           try {
-            newEdges.push(...grewrite.removeHEdgeWithDegree2Nodes(e));
+            if (gops.isHadamardEdge(e)) {
+              newEdges.push(...grewrite.removeHEdgeWithDegree2Nodes(e));
+            } else {
+              newNodes.push(grewrite.mergeNEdge(e));
+            }
           } catch (e) {
             console.warn(e.message);
           }
         }
-        selectedEdges.value = newEdges;
-        selectedNodes.value = [];
+        if (newEdges.length > 0) {
+          selectedEdges.value = newEdges;
+          selectedNodes.value = [];
+        } else {
+          selectedEdges.value = [];
+          selectedNodes.value = newNodes;
+        }
         window.setTimeout(() => {
           selectedEdges.value = newEdges; // Hack
         }, 0);
@@ -896,7 +920,9 @@ const command = (code) => {
         styleStore.view.layoutHandler.findBestNodePositions(
           Object.keys(gops.graph.nodes),
           true,
-          true
+          true,
+          gops.graph.layouts.nodes,
+          gops.graph.nodes
         );
         recordAfterGraphMod("move nodes (realign to grid)");
         break;
@@ -1025,7 +1051,11 @@ const checkCanDoCommand = {
   }),
   h: computed(() => {
     for (const edge of selectedEdges.value) {
-      if (grewrite.removeHEdgeWithDegree2NodesIsValid(edge)) return true;
+      if (gops.isHadamardEdge(edge)) {
+        if (grewrite.removeHEdgeWithDegree2NodesIsValid(edge)) return true;
+      } else {
+        if (grewrite.mergeNEdgeIsValid(edge)) return true;
+      }
     }
     return false;
   }),
@@ -1547,7 +1577,7 @@ const getAsSvg = (vgraph, permalink) => {
 
 <template>
   <TheGraphView
-    :graph="graphStore"
+    :graph="graphUpdater.displayGraph"
     v-model:selectedNodes="selectedNodes"
     v-model:selectedEdges="selectedEdges"
     v-model:markedNodes="markedNodes"

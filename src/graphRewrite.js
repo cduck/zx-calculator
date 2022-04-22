@@ -166,6 +166,32 @@ export class GraphRewrite {
     }
   }
 
+  // Merge nodes
+  // The edge must be a normal edge with its nodes the same Z- or X-type
+  mergeNEdgeIsValid(edge) {
+    try {
+      this.mergeNEdge(edge, true);
+    } catch (e) {
+      if (e instanceof GraphRewriteException) return false;
+      throw e;
+    }
+    return true;
+  }
+  mergeNEdge(edge, dryRun) {
+    const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+    if (!this.graphOps.isZOrXNode(n1)) {
+      throw new GraphRewriteException("node is not Z- or X-type");
+    }
+    const nodeType = this.graphOps.nodeType(n1);
+    if (this.graphOps.nodeType(n2) !== nodeType) {
+      throw new GraphRewriteException("node types do not match");
+    }
+    if (!dryRun) {
+      let [nMerge, nOther] = this.graphOps.nodesOfEdge(edge);
+      return this._mergeNodesHelper(nMerge, nOther);
+    }
+  }
+
   // Hadamard cancellation
   // The edge must be a Hadamard edge
   // Either of the edge's two nodes must satisfy the constraints of
@@ -243,112 +269,122 @@ export class GraphRewrite {
       throw new GraphRewriteException("node has fewer than 2 neighbors");
     }
     if (!dryRun) {
-      // Merge these nodes by deleting nOther and transferring its edges
       let [nMerge, nOther] = neighbors;
-      if (startingEdge) {
-        // Used to control which new edge to return
-        const [t1, t2] = this.graphOps.nodesOfEdge(startingEdge);
-        const preferredNode = t1 === node ? t2 : t1;
-        if (preferredNode !== nOther) {
-          [nMerge, nOther] = [nOther, nMerge];
-        }
+      return this._mergeNodesHelper(nMerge, nOther, node, startingEdge);
+    }
+  }
+
+  // If nMerge and nOther are neighbors:
+  // Leave nBetween and startingEdge undefined
+  // If they are separated by a single node (distance 2 apart):
+  // Pass their common neighbor as nBetween and optionally startingEdge to
+  // control which node is selected to be removed
+  // This helper does not check or ensure graph properties are preserved
+  _mergeNodesHelper(nMerge, nOther, nBetween, startingEdge) {
+    // Merge these nodes by deleting nOther and transferring its edges
+    if (startingEdge) {
+      // Used to control which new edge to return
+      const [t1, t2] = this.graphOps.nodesOfEdge(startingEdge);
+      const preferredNode = t1 === nBetween ? t2 : t1;
+      if (preferredNode !== nOther) {
+        [nMerge, nOther] = [nOther, nMerge];
       }
-      const oldTransfer = [];
-      const newTransfer = [];
-      let rmEdge;
-      // Add edges
-      this.graphOps.forEdgesOfNodesMutate([nOther], (edge) => {
-        const [n1, n2] = this.graphOps.nodesOfEdge(edge);
-        if (n1 === node || n2 === node) {
-          rmEdge = edge;
-        } else {
-          const n = n1 === nOther ? n2 : n1;
-          const newEdge = this.graphOps.isHadamardEdge(edge)
-            ? this.graphOps.toggleHadamardEdgeHandleSelfLoop(nMerge, n) ?? null
-            : this.graphOps.addEdge(nMerge, n, this.graphOps.edgeType(edge));
-          oldTransfer.push(edge);
-          newTransfer.push(newEdge);
-        }
-      });
-      // Adjust paths
-      this.graphOps.forPathsOfEdges(oldTransfer, (pathId) => {
-        const pathEdges = this.graphOps.pathEdges(pathId);
-        const transerIdx = [];
-        for (let i = 0; i < oldTransfer.length; i++) {
-          if (pathEdges.indexOf(oldTransfer[i]) >= 0) {
-            transerIdx.push(i);
-          }
-        }
-        if (transerIdx.length === 1) {
-          // Path goes through the given node
-          if (pathEdges.indexOf(rmEdge) < 0) {
-            throw new GraphRewriteException("disconnected path nearby (1)");
-          }
-          const pedge = oldTransfer[transerIdx[0]];
-          const nedge = newTransfer[transerIdx[0]];
-          const [n1] = this.graphOps.nodesOfEdge(pedge);
-          if (n1 === nOther) {
-            // Forward path
-            this.graphOps.substitutePathEdge(pedge, [nedge], 2, 0);
-          } else {
-            // Reverse path
-            this.graphOps.substitutePathEdge(pedge, [nedge], 0, 2);
-          }
-        } else if (transerIdx.length === 2) {
-          // Path only goes through the merged neighbor node
-          const pedge1 = oldTransfer[transerIdx[0]];
-          const pedge2 = oldTransfer[transerIdx[1]];
-          const nedge1 = newTransfer[transerIdx[0]];
-          const nedge2 = newTransfer[transerIdx[1]];
-          const e1SelfLoop =
-            !nedge1 && this.graphOps.nodesOfEdge(pedge1).indexOf(nMerge) >= 0;
-          const e2SelfLoop =
-            !nedge2 && this.graphOps.nodesOfEdge(pedge2).indexOf(nMerge) >= 0;
-          let inserted = [nedge1, nedge2];
-          if (e1SelfLoop) {
-            inserted = [nedge2];
-          } else if (e2SelfLoop) {
-            inserted = [nedge1];
-          } else if (!nedge1 || !nedge2) {
-            // Cannot adjust path because all connecting edges were deleted
-            console.warn("Failed to preserve path");
-            return; // Don't adjust path, let it be deleted
-          }
-          const [, n2] = this.graphOps.nodesOfEdge(pedge1);
-          if (n2 === nOther) {
-            // Forward path
-            this.graphOps.substitutePathEdge(pedge1, inserted, 0, 1);
-          } else {
-            // Reverse path
-            this.graphOps.substitutePathEdge(pedge1, inserted, 1, 0);
-          }
-        } else if (transerIdx.length > 2) {
-          // Too many matched edges
-          throw new GraphRewriteException("malformed path nearby");
-        } else {
-          assert(false, "forPathsOfEdges matched without any matching edges");
-        }
-      });
-      // Move merged node to average of old positions
-      if (!startingEdge) {
-        const nodePositions = this.graphOps.graph.layouts.nodes;
-        if (nodePositions[nMerge] && nodePositions[nOther]) {
-          nodePositions[nMerge].x +=
-            (nodePositions[nOther].x - nodePositions[nMerge].x) / 2;
-          nodePositions[nMerge].y +=
-            (nodePositions[nOther].y - nodePositions[nMerge].y) / 2;
-        }
-      }
-      // Sum angles
-      this.graphOps.addAngle(nMerge, this.graphOps.angle(nOther));
-      // Delete nodes and edges
-      this.graphOps.deleteNodes([node, nOther]);
-      // Return a useful output
-      if (startingEdge) {
-        return newTransfer.filter((e) => e !== null);
+    }
+    const oldTransfer = [];
+    const newTransfer = [];
+    let rmEdge;
+    // Add edges
+    this.graphOps.forEdgesOfNodesMutate([nOther], (edge) => {
+      const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+      const n = n1 === nOther ? n2 : n1;
+      if (n === nBetween || n === nMerge) {
+        rmEdge = edge;
       } else {
-        return nMerge;
+        const newEdge = this.graphOps.isHadamardEdge(edge)
+          ? this.graphOps.toggleHadamardEdgeHandleSelfLoop(nMerge, n) ?? null
+          : this.graphOps.addEdge(nMerge, n, this.graphOps.edgeType(edge));
+        oldTransfer.push(edge);
+        newTransfer.push(newEdge);
       }
+    });
+    // Adjust paths
+    this.graphOps.forPathsOfEdges(oldTransfer, (pathId) => {
+      const pathEdges = this.graphOps.pathEdges(pathId);
+      const transerIdx = [];
+      for (let i = 0; i < oldTransfer.length; i++) {
+        if (pathEdges.indexOf(oldTransfer[i]) >= 0) {
+          transerIdx.push(i);
+        }
+      }
+      if (transerIdx.length === 1) {
+        // Path goes through the given node
+        if (pathEdges.indexOf(rmEdge) < 0) {
+          throw new GraphRewriteException("disconnected path nearby (1)");
+        }
+        const pedge = oldTransfer[transerIdx[0]];
+        const nedge = newTransfer[transerIdx[0]];
+        const [n1] = this.graphOps.nodesOfEdge(pedge);
+        if (n1 === nOther) {
+          // Forward path
+          this.graphOps.substitutePathEdge(pedge, [nedge], 1 + !!nBetween, 0);
+        } else {
+          // Reverse path
+          this.graphOps.substitutePathEdge(pedge, [nedge], 0, 1 + !!nBetween);
+        }
+      } else if (transerIdx.length === 2) {
+        // Path only goes through the merged neighbor node
+        const pedge1 = oldTransfer[transerIdx[0]];
+        const pedge2 = oldTransfer[transerIdx[1]];
+        const nedge1 = newTransfer[transerIdx[0]];
+        const nedge2 = newTransfer[transerIdx[1]];
+        const e1SelfLoop =
+          !nedge1 && this.graphOps.nodesOfEdge(pedge1).indexOf(nMerge) >= 0;
+        const e2SelfLoop =
+          !nedge2 && this.graphOps.nodesOfEdge(pedge2).indexOf(nMerge) >= 0;
+        let inserted = [nedge1, nedge2];
+        if (e1SelfLoop) {
+          inserted = [nedge2];
+        } else if (e2SelfLoop) {
+          inserted = [nedge1];
+        } else if (!nedge1 || !nedge2) {
+          // Cannot adjust path because all connecting edges were deleted
+          console.warn("Failed to preserve path");
+          return; // Don't adjust path, let it be deleted
+        }
+        const [, n2] = this.graphOps.nodesOfEdge(pedge1);
+        if (n2 === nOther) {
+          // Forward path
+          this.graphOps.substitutePathEdge(pedge1, inserted, 0, 1);
+        } else {
+          // Reverse path
+          this.graphOps.substitutePathEdge(pedge1, inserted, 1, 0);
+        }
+      } else if (transerIdx.length > 2) {
+        // Too many matched edges
+        throw new GraphRewriteException("malformed path nearby");
+      } else {
+        assert(false, "forPathsOfEdges matched without any matching edges");
+      }
+    });
+    // Move merged node to average of old positions
+    if (!startingEdge) {
+      const nodePositions = this.graphOps.graph.layouts.nodes;
+      if (nodePositions[nMerge] && nodePositions[nOther]) {
+        nodePositions[nMerge].x +=
+          (nodePositions[nOther].x - nodePositions[nMerge].x) / 2;
+        nodePositions[nMerge].y +=
+          (nodePositions[nOther].y - nodePositions[nMerge].y) / 2;
+      }
+    }
+    // Sum angles
+    this.graphOps.addAngle(nMerge, this.graphOps.angle(nOther));
+    // Delete nodes and edges
+    this.graphOps.deleteNodes(nBetween ? [nBetween, nOther] : [nOther]);
+    // Return a useful output
+    if (startingEdge) {
+      return newTransfer.filter((e) => e !== null);
+    } else {
+      return nMerge;
     }
   }
 
@@ -472,8 +508,11 @@ export class GraphRewrite {
       }
     }
     // Calculate new node positions
-    let [nodeX, nodeY] = this.graphOps.locationXY(node);
-    let [leftX, leftY] = this.graphOps.locationXY(node);
+    let [oldX, oldY] = this.graphOps.locationXY(node);
+    let nodeX = oldX;
+    let nodeY = oldY;
+    let leftX = oldX;
+    let leftY = oldY;
     for (const n of leftNodes) {
       leftX += this.graphOps.locationX(n);
       leftY += this.graphOps.locationY(n);
@@ -506,21 +545,33 @@ export class GraphRewrite {
       leftX,
       leftY,
       undefined,
+      true,
+      oldX,
+      oldY,
       true
     );
-    const newNode = this.graphOps.addNode(newNodeZxType, nodeX, nodeY);
+    const newNode = this.graphOps.addNode(
+      newNodeZxType,
+      nodeX,
+      nodeY,
+      undefined,
+      undefined,
+      oldX,
+      oldY,
+      true
+    );
     this.graphOps.setLocation(node, rightX, rightY);
-    this.graphOps.subtractAngle(node, leftAngle);
-    this.graphOps.setAngle(split, leftAngle);
+    this.graphOps.subtractAngle(node, leftAngle, true);
+    this.graphOps.setAngle(split, leftAngle, true);
     // Add edges
-    const newE1 = this.graphOps.addHadamardEdge(split, newNode);
-    const newE2 = this.graphOps.addHadamardEdge(newNode, node);
+    const newE1 = this.graphOps.addHadamardEdge(split, newNode, true);
+    const newE2 = this.graphOps.addHadamardEdge(newNode, node, true);
     // Transfer edges to split node
     const oldTransfer = leftEdges;
     const newTransfer = [];
     for (let i = 0; i < oldTransfer.length; i++) {
       const eType = this.graphOps.edgeType(oldTransfer[i]);
-      const newEdge = this.graphOps.addEdge(leftNodes[i], split, eType);
+      const newEdge = this.graphOps.addEdge(leftNodes[i], split, eType, true);
       newTransfer.push(newEdge);
     }
     // Update any paths
@@ -558,7 +609,7 @@ export class GraphRewrite {
       }
     });
     // Delete edges
-    this.graphOps.deleteEdges(oldTransfer);
+    this.graphOps.deleteEdges(oldTransfer, undefined, true, true);
     // Return new degree-2 node
     return newNode;
   }
@@ -1134,7 +1185,6 @@ export class GraphRewrite {
     const angleB = piB ? ANGLE_PI : ANGLE_ZERO;
     const pivotA = this.graphOps.addNode(nodeType, xA, yA, angleA);
     const pivotB = this.graphOps.addNode(nodeType, xB, yB, angleB);
-    console.log(xA, yA, xB, yB);
     for (const n of allNodesA) {
       this.graphOps.addHadamardEdge(pivotA, n);
     }
