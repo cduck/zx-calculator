@@ -368,12 +368,15 @@ export class GraphRewrite {
     });
     // Move merged node to average of old positions
     if (!startingEdge) {
-      const nodePositions = this.graphOps.graph.layouts.nodes;
-      if (nodePositions[nMerge] && nodePositions[nOther]) {
-        nodePositions[nMerge].x +=
-          (nodePositions[nOther].x - nodePositions[nMerge].x) / 2;
-        nodePositions[nMerge].y +=
-          (nodePositions[nOther].y - nodePositions[nMerge].y) / 2;
+      const [mX, mY] = this.graphOps.locationXY(nMerge);
+      const [oX, oY] = this.graphOps.locationXY(nOther);
+      if (
+        mX !== undefined &&
+        mY !== undefined &&
+        oX !== undefined &&
+        oY !== undefined
+      ) {
+        this.graphOps.setLocation(nMerge, (mX + oX) / 2, (mY + oY) / 2);
       }
     }
     // Sum angles

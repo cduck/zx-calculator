@@ -1,3 +1,5 @@
+import { isZero } from "@/angles.js";
+
 export class AnimationState {
   constructor(graph, nodesInfo, edgesInfo, anglesInfo) {
     this.graph = graph;
@@ -8,7 +10,6 @@ export class AnimationState {
 
   applyAnimationStart() {
     for (const [node, info] of Object.entries(this.nodesInfo.addedBefore)) {
-      console.log("new node", node, info);
       this.graph.nodes[node] = {
         ...(this.graph.nodes[node] ?? {}),
         zxType: info.zxType,
@@ -19,7 +20,6 @@ export class AnimationState {
         x: info.x,
         y: info.y,
       };
-      console.log(this.graph.nodes[node], this.graph.layouts.nodes[node]);
     }
     for (const node of Object.keys(this.nodesInfo.removedBefore)) {
       delete this.graph.nodes[node];
@@ -39,8 +39,8 @@ export class AnimationState {
     }
     for (const [node, info] of Object.entries(this.anglesInfo.setAtStart)) {
       this.graph.nodes[node] = {
-        ...(this.graph.nodes[node] ?? {}),
-        zxAngle: info.angle,
+        ...this.graph.nodes[node],
+        zxAngle: info.angle && !isZero(info.angle) ? info.angle : undefined,
       };
     }
   }
@@ -64,7 +64,28 @@ export class AnimationState {
         opacity: weightedAverage(info.opacity),
       };
     }
-    // TODO: Fade angle
+    // Fade old angle out then new angle in
+    for (const [node, info] of Object.entries(this.anglesInfo.animated)) {
+      let angle, opacity;
+      if (!info.angle[0] || isZero(info.angle[0])) {
+        angle = info.angle[1];
+        opacity = progress;
+      } else if (!info.angle[1] || isZero(info.angle[1])) {
+        angle = info.angle[1];
+        opacity = 1 - progress;
+      } else if (progress < 0.5) {
+        angle = info.angle[0];
+        opacity = 1 - 2 * progress;
+      } else {
+        angle = info.angle[1];
+        opacity = 2 * progress - 1;
+      }
+      this.graph.nodes[node] = {
+        ...this.graph.nodes[node],
+        zxAngle: angle,
+        labelOpacity: opacity,
+      };
+    }
   }
 
   applyAnimationEnd() {
@@ -189,7 +210,7 @@ export class AnimationSpec {
     const setAtStart = {};
     const setAtEnd = {};
     const animated = {};
-    for (const [node, info] of Object.entries(this.changingNodes)) {
+    for (const [node, info] of Object.entries(this.changingAngles)) {
       setAtStart[node] = { angle: info.oldAngle };
       setAtEnd[node] = { angle: info.newAngle };
       if (info.fade && info.oldAngle !== info.newAngle) {

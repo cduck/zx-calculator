@@ -253,11 +253,9 @@ export class GraphOps {
     if (this.findBestNodePositions && !forceLocation) {
       this.findBestNodePositions([nodeId]);
     }
-    if (oldX !== undefined && oldY !== undefined) {
-      const newX = this.graph.layouts.nodes[nodeId].x;
-      const newY = this.graph.layouts.nodes[nodeId].y;
-      this.animSpec.moveNode(nodeId, oldX, oldY, newX, newY);
-    }
+    const newX = this.graph.layouts.nodes[nodeId].x;
+    const newY = this.graph.layouts.nodes[nodeId].y;
+    this.animSpec.moveNode(nodeId, oldX ?? newX, oldY ?? newY, newX, newY);
   }
 
   isNodeNearBoundary(nodeId) {

@@ -123,7 +123,7 @@ export const useStyleStore = defineStore("graphStyle", {
           fontFamily: undefined,
           fontSize: 11,
           lineHeight: 1.1,
-          color: "black",
+          color: (n) => blackOp(n.labelOpacity ?? n.opacity ?? 1),
           margin: 4,
           direction: "north",
           background: {
