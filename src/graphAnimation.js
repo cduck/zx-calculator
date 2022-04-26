@@ -40,6 +40,25 @@ export class AnimationState {
         y: info.y,
       };
     }
+    for (const node of Object.keys(this.nodesInfo.removedAfter)) {
+      this.graph.nodes[node] = {
+        ...this.graph.nodes[node],
+        animateOut: true,
+      };
+    }
+    for (const [node, info] of Object.entries(this.nodesInfo.addedAfter)) {
+      if (this.nodesInfo.removedAfter[node]) continue;
+      this.graph.nodes[node] = {
+        ...this.graph.nodes[node],
+        zxType: info.zxType,
+        opacity: 0,
+      };
+      this.graph.layouts.nodes[node] = {
+        ...this.graph.layouts.nodes[node],
+        x: info.x,
+        y: info.y,
+      };
+    }
     for (const node of Object.keys(this.nodesInfo.removedBefore)) {
       delete this.graph.nodes[node];
       delete this.graph.layouts.nodes[node];
@@ -52,9 +71,22 @@ export class AnimationState {
         zxType: info.zxType,
         opacity: info.opacity,
       };
-      if (this.edgesInfo.removedAfter[edge]) {
-        this.graph.edges[edge].animateOut = true;
-      }
+    }
+    for (const edge of Object.keys(this.edgesInfo.removedAfter)) {
+      this.graph.edges[edge] = {
+        ...this.graph.edges[edge],
+        animateOut: true,
+      };
+    }
+    for (const [edge, info] of Object.entries(this.edgesInfo.addedAfter)) {
+      if (this.edgesInfo.removedAfter[edge]) continue;
+      this.graph.edges[edge] = {
+        ...this.graph.edges[edge],
+        source: info.source,
+        target: info.target,
+        zxType: info.zxType,
+        opacity: 0,
+      };
     }
     for (const edge of Object.keys(this.edgesInfo.removedBefore)) {
       delete this.graph.edges[edge];
@@ -63,6 +95,7 @@ export class AnimationState {
       this.graph.nodes[node] = {
         ...(this.graph.nodes[node] ?? assert(false, "node doesn't exist")),
         zxAngle: info.angle,
+        labelOpacity: info.labelOpacity * info.labelOpacity,
       };
     }
   }
@@ -94,7 +127,7 @@ export class AnimationState {
         angle = info.angle[1];
         opacity = progress;
       } else if (!info.angle[1]) {
-        angle = info.angle[1];
+        angle = info.angle[0];
         opacity = 1 - progress;
       } else if (progress < 0.5) {
         angle = info.angle[0];
@@ -106,7 +139,7 @@ export class AnimationState {
       this.graph.nodes[node] = {
         ...(this.graph.nodes[node] ?? assert(false, "node doesn't exist")),
         zxAngle: angle,
-        labelOpacity: opacity,
+        labelOpacity: opacity * opacity,
       };
     }
   }
@@ -118,9 +151,15 @@ export class AnimationState {
         zxAngle: info.angle,
       };
     }
+    for (const node of Object.keys(this.nodesInfo.addedAfter)) {
+      delete this.graph.nodes[node]?.opacity;
+    }
     for (const node of Object.keys(this.nodesInfo.removedAfter)) {
       delete this.graph.nodes[node];
       delete this.graph.layouts.nodes[node];
+    }
+    for (const edge of Object.keys(this.edgesInfo.addedAfter)) {
+      delete this.graph.edges[edge]?.opacity;
     }
     for (const edge of Object.keys(this.edgesInfo.removedAfter)) {
       delete this.graph.edges[edge];
@@ -153,10 +192,9 @@ export class AnimationSpec {
       if (s.into === "fade" || s.out === "fade") return true;
       if (s.oldX !== s.newX || s.oldY !== s.newY) return true;
     }
-    // Cannot currently fade angles
-    //for (const { fade } of Object.values(this.changingAngles)) {
-    //  if (fade) return true;
-    //}
+    for (const info of Object.values(this.changingAngles)) {
+      if (info.fade && info.oldAngle !== info.newAngle) return true;
+    }
     return false;
   }
 
@@ -174,18 +212,27 @@ export class AnimationSpec {
   animatedNodesInfo() {
     const addedBefore = {};
     const removedBefore = {};
+    const addedAfter = {};
     const removedAfter = {};
     const animated = {};
     for (const [node, info] of Object.entries(this.changingNodes)) {
       const oldOpacity = info.into === "fade" && info.out !== "fade" ? 0 : 1;
       const newOpacity = info.out === "fade" ? 0 : 1;
       if (info.into) {
-        addedBefore[node] = {
-          zxType: info.zxType,
-          x: info.oldX,
-          y: info.oldY,
-          opacity: oldOpacity,
-        };
+        if (info.into === "end") {
+          addedAfter[node] = {
+            zxType: info.zxType,
+            x: info.newX,
+            y: info.newY,
+          };
+        } else {
+          addedBefore[node] = {
+            zxType: info.zxType,
+            x: info.oldX,
+            y: info.oldY,
+            opacity: oldOpacity,
+          };
+        }
       }
       if (info.out) {
         if (info.out === "start") removedBefore[node] = {};
@@ -204,23 +251,32 @@ export class AnimationSpec {
         };
       }
     }
-    return { addedBefore, removedBefore, removedAfter, animated };
+    return { addedBefore, removedBefore, addedAfter, removedAfter, animated };
   }
   animatedEdgesInfo() {
     const all = {};
     const addedBefore = {};
     const removedBefore = {};
+    const addedAfter = {};
     const removedAfter = {};
     const animated = {};
     for (const [edge, info] of Object.entries(this.changingEdges)) {
       all[edge] = info;
       if (info.into) {
-        addedBefore[edge] = {
-          source: info.source,
-          target: info.target,
-          zxType: info.zxType,
-          opacity: info.into === "fade" && info.out !== "fade" ? 0 : 1,
-        };
+        if (info.into === "end") {
+          addedAfter[edge] = {
+            source: info.source,
+            target: info.target,
+            zxType: info.zxType,
+          };
+        } else {
+          addedBefore[edge] = {
+            source: info.source,
+            target: info.target,
+            zxType: info.zxType,
+            opacity: info.into === "fade" && info.out !== "fade" ? 0 : 1,
+          };
+        }
       }
       if (info.out) {
         if (info.out === "start") removedBefore[edge] = {};
@@ -232,7 +288,7 @@ export class AnimationSpec {
         animated[edge] = { opacity: [0, 1] };
       }
     }
-    return { addedBefore, removedBefore, removedAfter, animated };
+    return { addedBefore, removedBefore, addedAfter, removedAfter, animated };
   }
   animatedAnglesInfo() {
     const setAtStart = {};
@@ -243,19 +299,32 @@ export class AnimationSpec {
       setAtEnd[node] = { angle: info.newAngle };
       if (info.fade && info.oldAngle !== info.newAngle) {
         animated[node] = { angle: [info.oldAngle, info.newAngle] };
+        if (!info.oldAngle) {
+          setAtStart[node].labelOpacity = 0;
+        }
       }
     }
     return { setAtStart, setAtEnd, animated };
   }
 
   ////////// Log graph changes with animation hints //////////
-  addEdge(edge, source, target, zxType, addInstant) {
+  addEdge(edge, source, target, zxType, addInstant, noFade) {
     if (!this.changingEdges[edge]) {
       this.changingEdges[edge] = {
         source,
         target,
         zxType,
-        into: addInstant ? "start" : "fade",
+        into: addInstant ? "start" : noFade ? "end" : "fade",
+      };
+    }
+  }
+
+  setEdgeType(edge, zxType) {
+    if (this.changingEdges[edge]?.into) {
+      this.changingEdges[edge].zxType = zxType;
+    } else {
+      this.changingEdges[edge] = {
+        zxType,
       };
     }
   }
@@ -269,7 +338,7 @@ export class AnimationSpec {
     }
   }
 
-  addNode(node, zxType, oldX, oldY, newX, newY, addInstant) {
+  addNode(node, zxType, oldX, oldY, newX, newY, addInstant, noFade) {
     if (!this.changingNodes[node]) {
       this.changingNodes[node] = {
         zxType,
@@ -277,7 +346,7 @@ export class AnimationSpec {
         oldY: oldY ?? newY ?? undefined,
         newX: newX ?? oldX ?? undefined,
         newY: newY ?? oldY ?? undefined,
-        into: addInstant ? "start" : "fade",
+        into: addInstant ? "start" : noFade ? "end" : "fade",
       };
     }
   }
@@ -320,7 +389,7 @@ export class AnimationSpec {
         this.changingAngles[node].fade || !setAtEnd;
     } else {
       this.changingAngles[node] = {
-        oldAngle: setInstant ? newAngle : oldAngle,
+        oldAngle: setInstant && !setAtEnd ? newAngle : oldAngle,
         newAngle,
         fade: !setInstant && !setAtEnd,
       };

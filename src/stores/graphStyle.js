@@ -168,7 +168,7 @@ export const useStyleStore = defineStore("graphStyle", {
             )(n.opacity ?? 1)),
         }),
         gap: 15,
-        margin: 1.5 / 2 - 4 / 2,
+        margin: null,
         type: "curve",
         summarize: false,
         zOrder: {

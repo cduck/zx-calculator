@@ -620,6 +620,7 @@ const snapshotDelete = (g) => {
   }
 };
 const edgeMultiClick = (detail) => {
+  graphUpdater.cancelSelectionRestore();
   document.activeElement.blur();
   const e = detail.event;
   if (!graphStore.edges[detail.edge]) return;
@@ -638,6 +639,7 @@ const edgeMultiClick = (detail) => {
   }
 };
 const nodeMultiClick = (detail) => {
+  graphUpdater.cancelSelectionRestore();
   document.activeElement.blur();
   const e = detail.event;
   if (!graphStore.nodes[detail.node]) return;
@@ -711,6 +713,13 @@ const command = (code) => {
       case "n": {
         recordBeforeGraphMod();
         const name = addZNodes();
+        recordAfterGraphMod(`edit:${name}`);
+        break;
+      }
+      case "N": {
+        // Add X node instead
+        recordBeforeGraphMod();
+        const name = addZNodes(true);
         recordAfterGraphMod(`edit:${name}`);
         break;
       }
@@ -974,6 +983,7 @@ const command = (code) => {
 const checkCanDoCommandEdit = {
   // Edit mode
   n: ref(true),
+  N: ref(true),
   b: ref(true),
   e: computed(() => selectedNodes.value.length >= 2),
   E: computed(() => {
@@ -983,9 +993,6 @@ const checkCanDoCommandEdit = {
     });
     return anyEdges;
   }),
-  x: computed(
-    () => selectedNodes.value.length > 0 || selectedEdges.value.length > 0
-  ),
   a: computed(() => {
     try {
       angles.cleanInputStr(panelStore.angleToSet || "0");
@@ -1106,6 +1113,10 @@ const checkCanDoCommandRewrite = {
   O: computed(() => checkCanDoCommand.P),
 };
 const checkCanDoCommandOther = {
+  // Mainly edit mode but allowed for deleting temp pivot nodes in rewrite mode
+  x: computed(
+    () => selectedNodes.value.length > 0 || selectedEdges.value.length > 0
+  ),
   // All modes
   r: computed(() =>
     panelStore.rewriteMode
@@ -1136,7 +1147,7 @@ const checkCanDoCommand = {
 
 // Graph edit commands that adjust or use the selections before operating on the
 // graph
-const addZNodes = () => {
+const addZNodes = (addX) => {
   if (selectedEdges.value.length > 0) {
     // For convenience, replace each edge with a new connected node
     const newNodes = [];
@@ -1144,25 +1155,27 @@ const addZNodes = () => {
       newNodes.push(...gops.insertNewNodesAlongEdge(edge, 1)[0]);
     }
     setSelectionCallback(newNodes, []);
-    return "insert z node";
+    return addX ? "insert x node" : "insert z node";
   } else {
-    let x, y;
+    let x, y, x2;
     if (selectedNodes.value.length > 0) {
-      [x, y] = gops.coordsOfNode(selectedNodes.value[0]);
-      x += styleStore.layout.distance;
+      [x, y] = gops.locationXY(selectedNodes.value[0]);
+      x2 = x + styleStore.layout.distance;
     }
-    const node = gops.addZNode(x, y);
+    const node = addX
+      ? gops.addXNode(x2, y, undefined, undefined, x, y)
+      : gops.addZNode(x2, y, undefined, undefined, x, y);
     // For convenience, connect each previously selected node to the new node
     for (const n of selectedNodes.value) {
       if (gops.isBoundaryNode(n)) {
-        gops.addNormalEdge(n, node);
+        gops.addNormalEdge(n, node, x !== undefined);
       } else {
-        gops.addHadamardEdge(n, node);
+        gops.addHadamardEdge(n, node, x !== undefined);
       }
     }
     // For convenience, change the selection to just the new node
     setSelectionCallback([node], []);
-    return "new z node";
+    return addX ? "new x node" : "new z node";
   }
 };
 
@@ -1170,10 +1183,10 @@ const addBoundaryNodes = () => {
   if (selectedNodes.value.length > 0) {
     const edges = [];
     for (const n of selectedNodes.value) {
-      let [x, y] = gops.coordsOfNode(n);
-      x += styleStore.layout.distance;
-      const node = gops.addBoundaryNode(x, y);
-      edges.push(gops.addNormalEdge(n, node));
+      let [x, y] = gops.locationXY(n);
+      const x2 = x + styleStore.layout.distance;
+      const node = gops.addBoundaryNode(x2, y, undefined, undefined, x, y);
+      edges.push(gops.addNormalEdge(n, node, true));
       setSelectionCallback([], edges);
     }
   } else {

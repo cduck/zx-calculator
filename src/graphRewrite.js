@@ -136,7 +136,9 @@ export class GraphRewrite {
         edge,
         1,
         "hadamard",
-        zxNodeType
+        zxNodeType,
+        oldType === "normal" ? undefined : n1,
+        true
       );
       const bEdge = flip ? newEdges[newEdges.length - 1] : newEdges[0];
       if (oldType === "hadamard") {
@@ -206,7 +208,12 @@ export class GraphRewrite {
     return true;
   }
   removeHEdgeWithDegree2Nodes(edge, dryRun) {
-    const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+    let [n1, n2] = this.graphOps.nodesOfEdge(edge);
+    const [x1, y1] = this.graphOps.locationXY(n1);
+    const [x2, y2] = this.graphOps.locationXY(n2);
+    if (x2 < x1 || (x2 === x1 && y2 < y1)) {
+      [n1, n2] = [n2, n1]; // Prefer to remove rightmost
+    }
     try {
       return this.removeDegree2NodeWithHEdges(n1, edge, dryRun);
     } catch (e) {
@@ -293,16 +300,46 @@ export class GraphRewrite {
     const oldTransfer = [];
     const newTransfer = [];
     let rmEdge;
+    // Find far node for animation positioning
+    let nFar;
+    if (
+      startingEdge &&
+      this.graphOps.hasAngleZero(nOther) &&
+      this.graphOps.degree(nOther) === 2
+    ) {
+      // Animate and fade nodes to the middle of the output edge
+      this.graphOps.forEdgesOfNodes([nOther], (edge) => {
+        const [n1, n2] = this.graphOps.nodesOfEdge(edge);
+        const neighbor = n1 === nOther ? n2 : n1;
+        if (neighbor !== nBetween && neighbor !== nMerge) nFar = neighbor;
+      });
+    }
+    // Calculate degree before adding edges
+    const mDeg = this.graphOps.degree(nMerge);
+    const oDeg = this.graphOps.degree(nOther);
     // Add edges
     this.graphOps.forEdgesOfNodesMutate([nOther], (edge) => {
       const [n1, n2] = this.graphOps.nodesOfEdge(edge);
       const n = n1 === nOther ? n2 : n1;
-      if (n === nBetween || n === nMerge) {
+      if (n === nBetween || (!nBetween && n === nMerge)) {
         rmEdge = edge;
       } else {
         const newEdge = this.graphOps.isHadamardEdge(edge)
-          ? this.graphOps.toggleHadamardEdgeHandleSelfLoop(nMerge, n) ?? null
-          : this.graphOps.addEdge(nMerge, n, this.graphOps.edgeType(edge));
+          ? this.graphOps.toggleHadamardEdgeHandleSelfLoop(
+              nMerge,
+              n,
+              undefined,
+              false,
+              false,
+              true
+            ) ?? null
+          : this.graphOps.addEdge(
+              nMerge,
+              n,
+              this.graphOps.edgeType(edge),
+              false,
+              true
+            );
         oldTransfer.push(edge);
         newTransfer.push(newEdge);
       }
@@ -367,22 +404,55 @@ export class GraphRewrite {
       }
     });
     // Move merged node to average of old positions
+    let [mX, mY] = this.graphOps.locationXY(nMerge);
+    const [oX, oY] = this.graphOps.locationXY(nOther);
     if (!startingEdge) {
-      const [mX, mY] = this.graphOps.locationXY(nMerge);
-      const [oX, oY] = this.graphOps.locationXY(nOther);
-      if (
-        mX !== undefined &&
-        mY !== undefined &&
-        oX !== undefined &&
-        oY !== undefined
-      ) {
-        this.graphOps.setLocation(nMerge, (mX + oX) / 2, (mY + oY) / 2);
+      let forcePos = true;
+      if (mDeg > 1 && oDeg > 1) {
+        if (nBetween) {
+          [mX, mY] = this.graphOps.locationXY(nBetween);
+        } else {
+          mX = (mX + oX) / 2;
+          mY = (mY + oY) / 2;
+          forcePos = false;
+        }
+      } else if (oDeg > 1) {
+        mX = oX;
+        mY = oY;
+      }
+      this.graphOps.setLocation(nMerge, mX, mY, forcePos);
+      if (!forcePos) {
+        [mX, mY] = this.graphOps.locationXY(nMerge);
       }
     }
     // Sum angles
-    this.graphOps.addAngle(nMerge, this.graphOps.angle(nOther));
+    const noFade =
+      this.graphOps.hasAngleZero(nOther) || this.graphOps.hasAngleZero(nMerge);
+    this.graphOps.addAngle(nMerge, this.graphOps.angle(nOther), noFade, noFade);
+    if (!noFade) {
+      this.graphOps.setAngle(nOther, ""); // Ensure the angle animates
+    }
     // Delete nodes and edges
-    this.graphOps.deleteNodes(nBetween ? [nBetween, nOther] : [nOther]);
+    const finalLocs = {};
+    if (nFar && !startingEdge) {
+      // Animate and fade nodes to the middle of the edge
+      const [farX, farY] = this.graphOps.locationXY(nFar);
+      const midX = (mX + (farX ?? mX)) / 2;
+      const midY = (mY + (farY ?? mY)) / 2;
+      finalLocs[nBetween] = { x: midX, y: midY };
+      finalLocs[nOther] = { x: midX, y: midY };
+    } else {
+      // Animate nodes toward nMerge
+      finalLocs[nBetween] = { x: mX, y: mY };
+      finalLocs[nOther] = { x: mX, y: mY };
+    }
+    for (let i = 0; i < newTransfer.length; i++) {
+      this.graphOps.deleteEdges([oldTransfer[i]], undefined, !!newTransfer[i]);
+    }
+    this.graphOps.deleteNodes([nOther], finalLocs, nFar ? false : true, false);
+    if (nBetween) {
+      this.graphOps.deleteNodes([nBetween], finalLocs, false, false, true);
+    }
     // Return a useful output
     if (startingEdge) {
       return newTransfer.filter((e) => e !== null);
@@ -946,8 +1016,16 @@ export class GraphRewrite {
       }
     }
     // Delete two pivot nodes and edges
+    const [aX, aY] = this.graphOps.locationXY(pivotA);
+    const [bX, bY] = this.graphOps.locationXY(pivotB);
+    const midX = (aX + bX) / 2;
+    const midY = (aY + bY) / 2;
+    const finalLocs = {};
+    finalLocs[pivotA] = { x: midX, y: midY };
+    finalLocs[pivotB] = { x: midX, y: midY };
     this.graphOps.deleteEdges(edgesToRemove);
-    this.graphOps.deleteNodes([pivotA, pivotB]); // Also removes starEdges
+    this.graphOps.deleteEdges(starEdges);
+    this.graphOps.deleteNodes([pivotA, pivotB], finalLocs);
     return [...neighborsA, ...neighborsB, ...neighborsAB];
   }
 
@@ -1011,14 +1089,14 @@ export class GraphRewrite {
   // and may only have Hadamard edges between each other
   revPivotStep2IsValid(nodes, addPi, xB, yB) {
     try {
-      this.revPivotStep2(nodes, addPi, xB, yB, true);
+      this.revPivotStep2(nodes, addPi, xB, yB, false, true);
     } catch (e) {
       if (e instanceof GraphRewriteException) return false;
       throw e;
     }
     return true;
   }
-  revPivotStep2(nodes, addPi, xB, yB, dryRun) {
+  revPivotStep2(nodes, addPi, xB, yB, existingB, dryRun) {
     if (
       nodes.length === 2 &&
       this.graphOps.nodeType(nodes[0]) === "pivotA" &&
@@ -1047,6 +1125,7 @@ export class GraphRewrite {
         newAddPi,
         this.graphOps.locationX(nodes[1]),
         this.graphOps.locationY(nodes[1]),
+        true,
         dryRun
       );
       if (!dryRun) {
@@ -1085,15 +1164,17 @@ export class GraphRewrite {
       nodesA.push(neighbor);
     });
     // Run reverse pivot
+    const [xA, yA] = this.graphOps.locationXY(pivotA);
     const ret = this.revPivot(
       nodesA,
       nodesB,
       piA,
       addPi,
-      this.graphOps.locationX(pivotA),
-      this.graphOps.locationY(pivotA),
+      xA,
+      yA,
       xB,
       yB,
+      existingB,
       dryRun
     );
     if (!dryRun) {
@@ -1101,7 +1182,7 @@ export class GraphRewrite {
     }
     return ret;
   }
-  revPivot(allNodesA, allNodesB, piA, piB, xA, yA, xB, yB, dryRun) {
+  revPivot(allNodesA, allNodesB, piA, piB, xA, yA, xB, yB, existingB, dryRun) {
     // Get node sets
     const setAllA = new Set(allNodesA);
     const setAllB = new Set(allNodesB);
@@ -1186,8 +1267,16 @@ export class GraphRewrite {
     // Add two pivot nodes and star edges
     const angleA = piA ? ANGLE_PI : ANGLE_ZERO;
     const angleB = piB ? ANGLE_PI : ANGLE_ZERO;
-    const pivotA = this.graphOps.addNode(nodeType, xA, yA, angleA);
-    const pivotB = this.graphOps.addNode(nodeType, xB, yB, angleB);
+    const pivotA = this.graphOps.addNode(nodeType, xA, yA, angleA, true);
+    const pivotB = this.graphOps.addNode(
+      nodeType,
+      xB,
+      yB,
+      angleB,
+      existingB,
+      existingB ? xB : xA,
+      existingB ? yB : yA
+    );
     for (const n of allNodesA) {
       this.graphOps.addHadamardEdge(pivotA, n);
     }

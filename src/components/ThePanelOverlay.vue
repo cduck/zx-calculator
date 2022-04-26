@@ -645,7 +645,7 @@ watch(
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Identity Removal:<br />Remove a degree-2 node by merging its two neighbors [J]"
+            tooltip="Identity Removal:<br />Remove a degree-2 node by merging its two neighbors (if connected by Hadamard edges and colors match) [J]"
           >
             <ElButton
               class="btn btn100"

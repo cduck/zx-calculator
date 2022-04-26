@@ -84,6 +84,7 @@ export class GraphOps {
   }
   setEdgeType(edgeId, zxType) {
     this.graph.edges[edgeId] = { ...this.graph.edges[edgeId], zxType: zxType };
+    this.animSpec.setEdgeType(edgeId, zxType);
   }
 
   isEdgesValidPath(edgeIds, ignoreCurrent) {
@@ -188,11 +189,6 @@ export class GraphOps {
   ////////// Graph queries //////////
   nodesOfEdge(edgeId) {
     return [this.graph.edges[edgeId].source, this.graph.edges[edgeId].target];
-  }
-
-  coordsOfNode(nodeId) {
-    const coords = this.graph.layouts.nodes[nodeId];
-    return [coords.x, coords.y];
   }
 
   degree(nodeId) {
@@ -477,7 +473,7 @@ export class GraphOps {
     );
   }
 
-  addEdge(n1, n2, zxType, addInstant) {
+  addEdge(n1, n2, zxType, addInstant, noFade) {
     assert(zxType, "required third argument");
     let edgeId = `edge${this.nextEdgeIndex}`;
     while (this.graph.edges[edgeId]) {
@@ -493,16 +489,23 @@ export class GraphOps {
       target: n2,
       zxType: zxType,
     };
-    this.animSpec.addEdge(edgeId, n1, n2, zxType, addInstant);
+    this.animSpec.addEdge(edgeId, n1, n2, zxType, addInstant, noFade);
     return edgeId;
   }
-  addNormalEdge(n1, n2, addInstant) {
-    return this.addEdge(n1, n2, "normal", addInstant);
+  addNormalEdge(n1, n2, addInstant, noFade) {
+    return this.addEdge(n1, n2, "normal", addInstant, noFade);
   }
-  addHadamardEdge(n1, n2, addInstant) {
-    return this.addEdge(n1, n2, "hadamard", addInstant);
+  addHadamardEdge(n1, n2, addInstant, noFade) {
+    return this.addEdge(n1, n2, "hadamard", addInstant, noFade);
   }
-  toggleHadamardEdgeHandleSelfLoop(n1, n2, dontToggle) {
+  toggleHadamardEdgeHandleSelfLoop(
+    n1,
+    n2,
+    dontToggle,
+    addInstant,
+    deleteInstant,
+    addNoFade
+  ) {
     // Find existing Hadamard edges
     const edges = [];
     let hasNormalEdge = false;
@@ -518,16 +521,21 @@ export class GraphOps {
       this.nodeType(n1) === this.nodeType(n2) &&
       this.isZOrXNode(n1)
     ) {
-      this.deleteEdges(edges);
+      this.deleteEdges(edges, undefined, deleteInstant, deleteInstant);
       if ((edges.length + !dontToggle) % 2 === 1) {
         // Self loop is equal to an extra pi phase
         this.addAngle(n1, ANGLE_PI);
       }
       return hasNormalEdge || undefined;
     } else {
-      this.deleteEdges(edges.slice((edges.length + !dontToggle) % 2));
+      this.deleteEdges(
+        edges.slice((edges.length + !dontToggle) % 2),
+        undefined,
+        deleteInstant,
+        deleteInstant
+      );
       if (edges.length <= 0 && !dontToggle) {
-        return this.addHadamardEdge(n1, n2);
+        return this.addHadamardEdge(n1, n2, addInstant, addNoFade);
       } else if ((edges.length + !dontToggle) % 2 == 1) {
         return edges[0];
       }
@@ -624,13 +632,13 @@ export class GraphOps {
     }
   }
 
-  deleteNodes(nodes, finalPositions, noFade, removeInstant) {
+  deleteNodes(nodes, finalPositions, noFade, removeInstant, edgeNoFade) {
     const oldEdges = [];
     // Find and remove edges
     this.forEdgesOfNodes(nodes, (edgeId) => {
       oldEdges.push(edgeId);
       delete this.graph.edges[edgeId];
-      this.animSpec.removeEdge(edgeId, noFade, removeInstant);
+      this.animSpec.removeEdge(edgeId, edgeNoFade ?? noFade, removeInstant);
     });
     // Remove any dependent paths
     this.clearPathsByEdges(oldEdges);
@@ -682,7 +690,7 @@ export class GraphOps {
 
   addAngle(nodeId, a, setInstant, setAtEnd) {
     const old = this.angle(nodeId);
-    if (old && old !== "0") {
+    if (old && !isZero(old)) {
       a = angleStrSum(old, a);
     }
     this.setAngle(nodeId, a, setInstant, setAtEnd);
@@ -728,10 +736,24 @@ export class GraphOps {
     this.graph.paths[this.newPathId()] = { edges: orderedEdges };
   }
 
-  insertNewNodesAlongEdge(edge, count, zxEdgeType, zxNodeType) {
+  insertNewNodesAlongEdge(
+    edge,
+    count,
+    zxEdgeType,
+    zxNodeType,
+    fromNode,
+    forceFade
+  ) {
     const [n1, n2] = this.nodesOfEdge(edge);
-    const [x1, y1] = this.coordsOfNode(n1);
-    const [x2, y2] = this.coordsOfNode(n2);
+    const [x1, y1] = this.locationXY(n1);
+    const [x2, y2] = this.locationXY(n2);
+    let fromX, fromY;
+    if (fromNode) {
+      [fromX, fromY] = this.locationXY(fromNode);
+    } else {
+      fromX = (x1 + x2) / 2;
+      fromY = (y1 + y2) / 2;
+    }
     let prev = n1;
     let node = n1;
     const newNodes = [];
@@ -739,7 +761,16 @@ export class GraphOps {
     for (let i = 0; i < count; i++) {
       const x = x1 + ((i + 1) * (x2 - x1)) / (count + 1);
       const y = y1 + ((i + 1) * (y2 - y1)) / (count + 1);
-      node = this.addNode(zxNodeType || "z", x, y);
+      node = this.addNode(
+        zxNodeType || "z",
+        x,
+        y,
+        undefined,
+        undefined,
+        fromX,
+        fromY,
+        !!fromNode && !forceFade
+      );
       newNodes.push(node);
       const auto = i === 0 && this.isBoundaryNode(n1) ? "normal" : "hadamard";
       const e = this.addEdge(prev, node, zxEdgeType || auto);

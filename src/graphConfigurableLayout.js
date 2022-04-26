@@ -28,6 +28,7 @@ export class GraphUpdateController {
     this.updateCallback = updateCallback;
     this.selectCallback = selectCallback;
     this.animQueue = [];
+    this.noSelectRestore = false;
 
     this.displayGraph = {
       nodes: reactive({}),
@@ -61,6 +62,7 @@ export class GraphUpdateController {
   }
 
   updateGraph(data, animSpec) {
+    this.noSelectRestore = false;
     if (data !== this.targetGraph) {
       overwriteDict(this.targetGraph.nodes, data.nodes);
       overwriteDict(this.targetGraph.edges, data.edges);
@@ -97,12 +99,21 @@ export class GraphUpdateController {
     const anim = this.animQueue[this.animQueue.length - 1];
     this.animQueue = [];
     this.updateGraph(newData ?? this.targetGraph);
-    if (this.selectCallback && (anim || selNodes || selEdges)) {
+    if (
+      this.selectCallback &&
+      (anim || selNodes || selEdges) &&
+      !this.noSelectRestore
+    ) {
       this.selectCallback(
         selNodes ?? anim.selectedNodes,
         selEdges ?? anim.selectedEdges
       );
     }
+    this.noSelectRestore = false;
+  }
+
+  cancelSelectionRestore() {
+    this.noSelectRestore = true;
   }
 
   _startAnimation() {
@@ -110,7 +121,7 @@ export class GraphUpdateController {
     this.state = this.animQueue[0].getAnimationState(this.displayGraph);
     this.state.applyAnimationStart();
     this._doUpdateCallback();
-    if (this.selectCallback) {
+    if (this.selectCallback && !this.noSelectRestore) {
       this.selectCallback(this.state.selectedNodes, this.state.selectedEdges);
     }
     this._startRequestAnimationFrame(this.state);
@@ -125,9 +136,10 @@ export class GraphUpdateController {
       this.targetGraph.layouts.nodes
     );
     this._doUpdateCallback();
-    if (this.selectCallback) {
+    if (this.selectCallback && !this.noSelectRestore) {
       this.selectCallback(state.selectedNodes, state.selectedEdges);
     }
+    this.noSelectRestore = false;
   }
 
   _startRequestAnimationFrame(state) {
