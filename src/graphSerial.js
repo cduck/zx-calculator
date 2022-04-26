@@ -59,16 +59,16 @@ export const serializeAll = (data, snapshots) => {
   }
 };
 
-export const deserializeAll = (str, ignoreSnapshots) => {
+export const deserializeAll = (str, idPrefix, ignoreSnapshots) => {
   if (!str.startsWith('{"')) {
-    return { g: deserialize(str) };
+    return { g: deserialize(str, idPrefix) };
   } else {
     const obj = JSON.parse(str);
-    const ret = { g: deserialize(obj.g) };
+    const ret = { g: deserialize(obj.g, idPrefix) };
     if (!ignoreSnapshots && obj.s && obj.s[0] !== undefined && obj.s.length) {
       ret.s = [];
       for (let i = 0; i + 1 < obj.s.length; i += 2) {
-        const graph = deserialize(obj.s[i + 1]);
+        const graph = deserialize(obj.s[i + 1], `${idPrefix}$s${i}$`);
         graph.label = `${obj.s[i]}`;
         ret.s.push(graph);
       }

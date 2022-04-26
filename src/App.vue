@@ -54,7 +54,7 @@ const undoStore = reactive(
     maxHistory: 0,
     linkToBrowser: true,
     serialize: (data) => serializeWithSnapshots(data),
-    deserialize: (str, clear) => deserializeIgnoreSnapshots(str, clear),
+    deserialize: (str) => deserializeWithSnapshots(str),
     title: (data, name, inHistory) =>
       "ZX Calculator — " +
       (inHistory ? `${graphSummary(data)}, ${name}` : graphSummary(data)),
@@ -480,7 +480,7 @@ const wereNodesOrEdgesSelected = () => {
     return selectedNodes.value.length > 0 || selectedEdges.value.length > 0;
   }
 };
-undoStore.browserNavigateCallback = (data) => {
+undoStore.browserNavigateCallback = (data, outOfHistory) => {
   // Don't save any changes to node positions
   // Change mode
   if (
@@ -493,6 +493,11 @@ undoStore.browserNavigateCallback = (data) => {
   // Update graph
   graphStateFullReplace(data);
   wereNodesMoved.value = false;
+  // Update URL with current snapshots
+  if (snapshotGraphs.value.length > 0 && !outOfHistory) {
+    // Write the current list of snapshots into any URL in the undo history
+    //undoStore.updateUrl(data);
+  }
 };
 const setSelectionCallback = (selNodes, selEdges, noTimeout) => {
   selectedNodes.value = selNodes;
@@ -1434,16 +1439,10 @@ const splitNodes = (useX) => {
 const serializeWithSnapshots = (data) => {
   return serializeAll(data, snapshotGraphs.value);
 };
-const deserializeIgnoreSnapshots = (str, clear) => {
-  const { g, s } = deserializeAll(str, !clear);
-  if (!clear && snapshotGraphs.value.length > 0) {
-    // Write the current list of snapshots into any URL you visit
-    undoStore.updateUrl(g);
-  }
-  // Only load snapshots on load/clear
-  if (clear) {
-    snapshotGraphs.value = s || [];
-  }
+const deserializeWithSnapshots = (str) => {
+  deserializeWithSnapshots.i = (deserializeWithSnapshots.i ?? -1) + 1;
+  const { g, s } = deserializeAll(str, `l${deserializeWithSnapshots.i}#`);
+  snapshotGraphs.value = s || [];
   return g;
 };
 

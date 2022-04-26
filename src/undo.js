@@ -106,26 +106,34 @@ export class UndoHistory {
     }
     if (found) {
       // This is in known history, go there
+      if (this.outOfHistory) {
+        // Coming from out of history back into known history
+        // Just call deserialize to repopulate any snapshots
+        const serial = decodeURIComponent(window.location.hash.slice(1));
+        if (serial && serial.length > 0 && this.deserialize) {
+          try {
+            this.deserialize(serial);
+          } catch (e) {
+            console.error("Graph parse from URL failed:", e.message || e);
+            return;
+          }
+        }
+      }
       delete this.outOfHistory;
       if (this.browserNavigateCallback) {
         const data = {
           ...this.history[this.currentIndex].data,
           rewriteMode: rmode,
         };
-        this.browserNavigateCallback(data);
+        this.browserNavigateCallback(data, false);
       }
-      if (
-        this.currentIndex < this.history.length - 1 &&
-        this.history[this.currentIndex + 1].fingerprint === fingerprint
-      ) {
-        // Update URL for this precise position
-        this._pushBrowserHistory(
-          this.history[this.currentIndex].data,
-          this.history[this.currentIndex].name,
-          fingerprint,
-          true
-        );
-      }
+      // Update URL for this precise position
+      this._pushBrowserHistory(
+        this.history[this.currentIndex].data,
+        this.history[this.currentIndex].name,
+        fingerprint,
+        true
+      );
     } else {
       this._loadCurrentUrl();
     }
@@ -140,19 +148,17 @@ export class UndoHistory {
     }
     let data;
     try {
-      data = this.deserialize
-        ? this.deserialize(serial, clearLocalHistory)
-        : JSON.parse(serial);
+      data = this.deserialize ? this.deserialize(serial) : JSON.parse(serial);
     } catch (e) {
       console.error("Graph parse from URL failed:", e.message || e);
       return;
     }
-    this.browserNavigateCallback(data);
+    this.browserNavigateCallback(data, true);
     if (clearLocalHistory) {
       delete this.outOfHistory;
       this.history = [];
       this.currentIndex = -1;
-      this.addEntry(data, "url", true, false);
+      this.addEntry(data, "url", true);
     } else {
       this.outOfHistory = data;
     }
@@ -195,13 +201,13 @@ export class UndoHistory {
     this._pushBrowserHistory(data, name, fingerprint, true);
   }
 
-  addEntry(dataCopy, name) {
+  addEntry(dataCopy, name, repBrowserHistory) {
     if (this.outOfHistory) {
       const oldData = this.outOfHistory;
       delete this.outOfHistory;
       this.history = [];
       this.currentIndex = -1;
-      this.addEntry(oldData, "url", true, false);
+      this.addEntry(oldData, "url", true);
     }
     const fingerprint = this._nextFingerprint();
     this.history.splice(this.currentIndex + 1); // Remove all redo entries
@@ -212,7 +218,7 @@ export class UndoHistory {
     });
     this.currentIndex = this.history.length - 1;
     this._trimToMaxLength();
-    this._pushBrowserHistory(dataCopy, name, fingerprint);
+    this._pushBrowserHistory(dataCopy, name, fingerprint, repBrowserHistory);
   }
 
   updateEntry(dataCopy, name) {
@@ -239,7 +245,7 @@ export class UndoHistory {
       delete this.outOfHistory;
       this.history = [];
       this.currentIndex = -1;
-      this.addEntry(oldData, "url", true, false);
+      this.addEntry(oldData, "url", true);
     }
     const fingerprint =
       this.history[this.currentIndex]?.fingerprint ?? this._nextFingerprint();
