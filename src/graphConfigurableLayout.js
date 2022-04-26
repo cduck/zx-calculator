@@ -18,7 +18,7 @@ const DEFAULT_OPTIONS = {
 };
 
 export class GraphUpdateController {
-  constructor(options, updateCallback) {
+  constructor(options, updateCallback, selectCallback) {
     this.options = options;
     for (const [k, v] of Object.entries(DEFAULT_OPTIONS)) {
       if (this.options[k] === undefined) {
@@ -26,6 +26,7 @@ export class GraphUpdateController {
       }
     }
     this.updateCallback = updateCallback;
+    this.selectCallback = selectCallback;
     this.animQueue = [];
 
     this.displayGraph = {
@@ -36,7 +37,6 @@ export class GraphUpdateController {
         nodes: reactive({}),
       },
     };
-
     this.targetGraph = {
       nodes: {},
       edges: {},
@@ -47,15 +47,29 @@ export class GraphUpdateController {
     };
   }
 
+  writeBackNodePositions() {
+    for (const [n, pos] of Object.entries(this.displayGraph.layouts.nodes)) {
+      const targetPos = this.targetGraph.layouts.nodes[n];
+      if (targetPos && (pos.x !== targetPos.x || pos.y !== targetPos.y)) {
+        this.targetGraph.layouts.nodes[n] = {
+          ...pos,
+          x: pos.x,
+          y: pos.y,
+        };
+      }
+    }
+  }
+
   updateGraph(data, animSpec) {
-    overwriteDict(this.targetGraph.nodes, data.nodes);
-    overwriteDict(this.targetGraph.edges, data.edges);
-    overwriteDict(this.targetGraph.paths, data.paths);
-    overwriteDict(this.targetGraph.layouts.nodes, data.layouts.nodes);
+    if (data !== this.targetGraph) {
+      overwriteDict(this.targetGraph.nodes, data.nodes);
+      overwriteDict(this.targetGraph.edges, data.edges);
+      overwriteDict(this.targetGraph.paths, data.paths);
+      overwriteDict(this.targetGraph.layouts.nodes, data.layouts.nodes);
+    }
 
     if (animSpec && animSpec.needsAnimation()) {
       // Queue animation
-      console.log("animate", animSpec);
       this.animQueue.push(animSpec);
       if (this.animQueue.length === 1) {
         // Start animation frames
@@ -67,23 +81,42 @@ export class GraphUpdateController {
       overwriteDict(this.displayGraph.edges, data.edges);
       overwriteDict(this.displayGraph.paths, data.paths);
       overwriteDict(this.displayGraph.layouts.nodes, data.layouts.nodes);
-      if (this.updateCallback) this.updateCallback();
+      this._doUpdateCallback();
     }
   }
 
-  cancelAnimation(newData) {
+  _doUpdateCallback() {
+    if (this.updateCallback) {
+      const layoutHandler = this.updateCallback();
+      layoutHandler.onNodesMovedCallback = () => this.writeBackNodePositions();
+    }
+  }
+
+  cancelAnimation(newData, selNodes, selEdges) {
+    if (this.state) this.state.stop = true;
+    const anim = this.animQueue[this.animQueue.length - 1];
     this.animQueue = [];
-    this.updateGraph(newData);
+    this.updateGraph(newData ?? this.targetGraph);
+    if (this.selectCallback && (anim || selNodes || selEdges)) {
+      this.selectCallback(
+        selNodes ?? anim.selectedNodes,
+        selEdges ?? anim.selectedEdges
+      );
+    }
   }
 
   _startAnimation() {
-    const state = this.animQueue[0].getAnimationState(this.displayGraph);
-    state.applyAnimationStart();
-    if (this.updateCallback) this.updateCallback();
-    this._startRequestAnimationFrame(state);
+    if (this.state) this.state.stop = true;
+    this.state = this.animQueue[0].getAnimationState(this.displayGraph);
+    this.state.applyAnimationStart();
+    this._doUpdateCallback();
+    if (this.selectCallback) {
+      this.selectCallback(this.state.selectedNodes, this.state.selectedEdges);
+    }
+    this._startRequestAnimationFrame(this.state);
   }
 
-  _finishAnimation() {
+  _finishAnimation(state) {
     overwriteDict(this.displayGraph.nodes, this.targetGraph.nodes);
     overwriteDict(this.displayGraph.edges, this.targetGraph.edges);
     overwriteDict(this.displayGraph.paths, this.targetGraph.paths);
@@ -91,32 +124,39 @@ export class GraphUpdateController {
       this.displayGraph.layouts.nodes,
       this.targetGraph.layouts.nodes
     );
-    if (this.updateCallback) this.updateCallback();
+    this._doUpdateCallback();
+    if (this.selectCallback) {
+      this.selectCallback(state.selectedNodes, state.selectedEdges);
+    }
   }
 
   _startRequestAnimationFrame(state) {
-    let startTime;
+    let startTime, lastTime;
     const duration = this.options.animDuration;
     const callback = (timestamp) => {
+      if (state.stop) return;
       if (this.animQueue.length <= 0) {
-        this._finishAnimation();
+        this._finishAnimation(state);
         return;
       }
       if (startTime === undefined) {
         startTime = timestamp;
       }
       const timeIn = timestamp - startTime;
-      if (timeIn < duration) {
-        state.applyAnimationStep(easeOut(timeIn, duration, 0, 1));
-      } else {
-        state.applyAnimationEnd();
+      if (!lastTime || timestamp > lastTime) {
+        if (timeIn < duration) {
+          state.applyAnimationStep(easeOut(timeIn, duration, 0, 1));
+        } else {
+          state.applyAnimationEnd();
+        }
+        this._doUpdateCallback();
       }
-      if (this.updateCallback) this.updateCallback();
 
+      lastTime = timestamp;
       if (timeIn >= duration) {
         this.animQueue.splice(0, 1);
         if (this.animQueue.length <= 0) {
-          this._finishAnimation();
+          this._finishAnimation(state);
         } else {
           this._startAnimation();
         }
@@ -207,6 +247,7 @@ export class ConfigurableLayout {
         delete nodePos.fy;
       }
     }
+    if (this.onNodesMovedCallback) this.onNodesMovedCallback();
     this.restartSimulation();
   }
 
@@ -263,7 +304,10 @@ export class ConfigurableLayout {
     const forceDist = forceGrid ? dist : undefined;
     const withNoInitPos = [];
     for (const nodeId of nodeIds) {
-      if (!layouts[nodeId]?.x || !layouts[nodeId]?.y) {
+      if (
+        layouts[nodeId]?.x === undefined ||
+        layouts[nodeId]?.y === undefined
+      ) {
         withNoInitPos.push(nodeId);
         continue;
       }

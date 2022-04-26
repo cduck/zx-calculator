@@ -673,6 +673,7 @@ export class GraphOps {
         zxAngle: angle,
       };
     } else {
+      angle = undefined;
       this.graph.nodes[nodeId] = { ...this.graph.nodes[nodeId] };
       delete this.graph.nodes[nodeId].zxAngle;
     }

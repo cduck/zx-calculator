@@ -31,8 +31,13 @@ import { SoundEffects } from "@/sound.js";
 const panelStore = usePanelStore();
 const styleStore = useStyleStore();
 const graphStore = useGraphStore();
-const graphUpdater = new GraphUpdateController(styleStore.layout, () =>
-  styleStore.view.layoutHandler.networkChanged()
+const graphUpdater = new GraphUpdateController(
+  styleStore.layout,
+  () => {
+    styleStore.view.layoutHandler.networkChanged();
+    return styleStore.view.layoutHandler;
+  },
+  (selNodes, selEdges) => setSelectionCallback(selNodes, selEdges)
 );
 const gops = new GraphOps(graphStore, (ns) =>
   styleStore.view.layoutHandler.findBestNodePositions(
@@ -267,7 +272,7 @@ const dragEnterHandler = (e) => {
     return;
   }
   e.dataTransfer.dropEffect = "copy";
-  dragOverlayVisible.value = true;
+  dragOverlayVisible.value = !panelStore.rewriteMode;
   e.preventDefault();
   e.stopPropagation();
 };
@@ -280,7 +285,7 @@ const dragOverHandler = (e) => {
     e.preventDefault();
     return;
   }
-  dragOverlayVisible.value = true;
+  dragOverlayVisible.value = !panelStore.rewriteMode;
   e.preventDefault();
   e.stopPropagation();
 };
@@ -404,9 +409,7 @@ const copyOrCutHandler = (e) => {
   const dataTransfer = e.clipboardData || e.dataTransfer;
   let copyData;
   if (e.type === "cut") {
-    recordBeforeGraphMod();
     copyData = cut(selectedNodes.value);
-    recordAfterGraphMod("edit:cut");
   } else {
     copyData = copy(selectedNodes.value);
   }
@@ -431,37 +434,29 @@ const graphSummary = (data) => {
     numEdges === 1 ? "" : "s"
   }`;
 };
-const makeFullGraphStateCopy = (recordMode) => {
+const makeFullGraphStateCopy = (recordMode, selNodes, selEdges) => {
+  graphUpdater.writeBackNodePositions();
   const data = graphStore.fullCopy();
-  data.selectedNodes = [...selectedNodes.value];
+  data.selectedNodes = [...(selNodes ?? selectedNodes.value)];
   data.selectedEdges =
-    data.selectedNodes.length <= 0 ? [...selectedEdges.value] : [];
+    data.selectedNodes.length <= 0
+      ? [...(selEdges ?? selectedEdges.value)]
+      : [];
   if (recordMode) {
     data.rewriteMode = !!panelStore.rewriteMode;
   }
   return data;
 };
 const graphStateFullReplace = (data) => {
-  selectedNodes.value = [];
-  selectedEdges.value = [];
   graphStore.fullReplace(data);
   gops.resetAnimationLog();
-  graphUpdater.cancelAnimation(data);
-  selectedNodes.value = (data?.selectedNodes ?? []).filter(
+  const selNodes = (data?.selectedNodes ?? []).filter(
     (n) => graphStore.nodes[n]
   );
-  selectedEdges.value = (data?.selectedEdges ?? []).filter(
+  const selEdges = (data?.selectedEdges ?? []).filter(
     (e) => graphStore.edges[e]
   );
-  window.setTimeout(() => {
-    // Hack fix
-    selectedNodes.value = (data?.selectedNodes ?? []).filter(
-      (n) => graphStore.nodes[n]
-    );
-    selectedEdges.value = (data?.selectedEdges ?? []).filter(
-      (e) => graphStore.edges[e]
-    );
-  }, 0);
+  graphUpdater.cancelAnimation(graphStore, selNodes, selEdges);
 };
 let wereNodesMoved = ref(false);
 const areSetsEqual = (set1, set2) => {
@@ -498,6 +493,18 @@ undoStore.browserNavigateCallback = (data) => {
   // Update graph
   graphStateFullReplace(data);
   wereNodesMoved.value = false;
+};
+const setSelectionCallback = (selNodes, selEdges, noTimeout) => {
+  selectedNodes.value = selNodes;
+  selectedEdges.value = selEdges;
+  window.clearTimeout(setSelectionCallback.id);
+  if (!noTimeout) {
+    setSelectionCallback.id = window.setTimeout(() => {
+      // Fix if graph viewer clears selection after graph change
+      selectedNodes.value = selNodes;
+      selectedEdges.value = selEdges;
+    }, 0);
+  }
 };
 const graphStateUndo = () => {
   // Save any changes to node positions without clearing redo history
@@ -546,6 +553,7 @@ const graphStateRedo = () => {
   }
 };
 const updateNodesMaybeMoved = () => {
+  graphUpdater.writeBackNodePositions();
   if (wereNodesMoved.value) {
     undoStore.updateEntry(makeFullGraphStateCopy(), "move nodes");
   } else {
@@ -573,9 +581,12 @@ const recordBeforeGraphMod = () => {
   }
   gops.resetAnimationLog();
 };
-const recordAfterGraphMod = (name, data) => {
-  data = data ?? makeFullGraphStateCopy(true);
-  graphUpdater.updateGraph(data, gops.animSpec);
+const recordAfterGraphMod = (name, data, selNodes, selEdges) => {
+  data = data ?? makeFullGraphStateCopy(true, selNodes, selEdges);
+  const anim = gops.animSpec;
+  anim.selectedNodes = selNodes ?? selectedNodes.value;
+  anim.selectedEdges = selEdges ?? selectedEdges.value;
+  graphUpdater.updateGraph(graphStore, anim);
   gops.resetAnimationLog();
   undoStore.addEntry(data, name);
   wereNodesMoved.value = false;
@@ -591,7 +602,12 @@ const appendSnapshot = (data) => {
 const snapshotSelect = (g) => {
   recordBeforeGraphMod();
   graphStateFullReplace(g);
-  recordAfterGraphMod("restore snapshot" + (g.label ? ` (${g.label})` : ""), g);
+  recordAfterGraphMod(
+    "restore snapshot" + (g.label ? ` (${g.label})` : ""),
+    g,
+    g.selectedNodes,
+    g.selectedEdges
+  );
 };
 const snapshotLabelChange = () => {
   undoStore.updateUrl();
@@ -606,15 +622,16 @@ const snapshotDelete = (g) => {
 const edgeMultiClick = (detail) => {
   document.activeElement.blur();
   const e = detail.event;
+  if (!graphStore.edges[detail.edge]) return;
   if (detail.count === 1) {
     if (e?.shiftKey || e?.metaKey || e?.shiftKey) {
       const newEdges = selectedEdges.value.filter((e) => e !== detail.edge);
       if (newEdges.length === selectedEdges.value.length) {
         newEdges.push(detail.edge);
       }
-      selectedEdges.value = newEdges;
+      setSelectionCallback([], newEdges, true);
     } else if (selectedEdges.value.indexOf(detail.edge) < 0) {
-      selectedEdges.value = [detail.edge];
+      setSelectionCallback([], [detail.edge], true);
     }
   } else if (detail.count > 1) {
     selectMultiNeighborhood(gops.nodesOfEdge(detail.edge), detail.count - 2);
@@ -623,19 +640,22 @@ const edgeMultiClick = (detail) => {
 const nodeMultiClick = (detail) => {
   document.activeElement.blur();
   const e = detail.event;
+  if (!graphStore.nodes[detail.node]) return;
   if (detail.count === 1) {
     if (e.altKey) {
-      selectedNodes.value = selectedNodes.value.filter(
-        (n) => n !== detail.node
+      setSelectionCallback(
+        selectedNodes.value.filter((n) => n !== detail.node),
+        [],
+        true
       );
     } else if (e.shiftKey || e.metaKey || e.shiftKey) {
       const newNodes = selectedNodes.value.filter((n) => n !== detail.node);
       if (newNodes.length === selectedNodes.value.length) {
         newNodes.push(detail.node);
       }
-      selectedNodes.value = newNodes;
+      setSelectionCallback(newNodes, [], true);
     } else if (selectedNodes.value.indexOf(detail.node) < 0) {
-      selectedNodes.value = [detail.node];
+      setSelectionCallback([detail.node], [], true);
     }
   } else if (detail.count > 1) {
     if (detail.count - 1 !== nodeMultiClick.prevCount) {
@@ -669,20 +689,21 @@ const selectMultiNeighborhood = (nodes, distance, deselect) => {
       nodes.add(n);
     }
   }
-  selectedEdges.value = [];
-  selectedNodes.value = [...nodes];
-  window.setTimeout(() => {
-    selectedEdges.value = [];
-    selectedNodes.value = [...nodes];
-  }, 0);
+  setSelectionCallback([...nodes], []);
 };
 
 // Execute graph commands
 const command = (code) => {
-  const canDo = checkCanDoCommand[code]?.value;
-  if (canDo === undefined) return false;
+  const canDoAny = checkCanDoCommand[code]?.value;
+  if (canDoAny === undefined) return false;
+  const canDo =
+    checkCanDoCommandOther[code]?.value ||
+    (panelStore.rewriteMode
+      ? checkCanDoCommandRewrite[code]?.value
+      : checkCanDoCommandEdit[code]?.value);
   if (!canDo) return true;
   console.log(`Command: ${code}`);
+  graphUpdater.cancelAnimation();
   let used = true;
   if (!panelStore.rewriteMode) {
     // Edit mode
@@ -767,7 +788,7 @@ const command = (code) => {
         // Hadamard cancellation
         recordBeforeGraphMod();
         const newEdges = [];
-        const newNodes = [];
+        let newNodes = [];
         for (const e of selectedEdges.value) {
           try {
             if (gops.isHadamardEdge(e)) {
@@ -780,15 +801,9 @@ const command = (code) => {
           }
         }
         if (newEdges.length > 0) {
-          selectedEdges.value = newEdges;
-          selectedNodes.value = [];
-        } else {
-          selectedEdges.value = [];
-          selectedNodes.value = newNodes;
+          newNodes = [];
         }
-        window.setTimeout(() => {
-          selectedEdges.value = newEdges; // Hack
-        }, 0);
+        setSelectionCallback(newNodes, newEdges);
         recordAfterGraphMod("rewrite:hadamard cancellation");
         break;
       }
@@ -810,11 +825,7 @@ const command = (code) => {
             console.warn(e.message);
           }
         }
-        selectedNodes.value = mergedNodes;
-        selectedEdges.value = [];
-        window.setTimeout(() => {
-          selectedNodes.value = mergedNodes; // Hack
-        }, 0);
+        setSelectionCallback(mergedNodes, []);
         recordAfterGraphMod("rewrite:merge node");
         break;
       }
@@ -834,11 +845,7 @@ const command = (code) => {
           } catch (e) {
             console.error(e.message);
           }
-          selectedNodes.value = nodes;
-          selectedEdges.value = [];
-          window.setTimeout(() => {
-            selectedNodes.value = nodes; // Hack
-          }, 0);
+          setSelectionCallback(nodes, []);
         }
         recordAfterGraphMod("rewrite:complementation");
         break;
@@ -846,8 +853,7 @@ const command = (code) => {
         // Reverse complementation
         recordBeforeGraphMod();
         const newNode = grewrite.revLocalComplementation(selectedNodes.value);
-        selectedNodes.value = [newNode];
-        selectedEdges.value = [];
+        setSelectionCallback([newNode], []);
         recordAfterGraphMod("rewrite:reverse complementation");
         break;
       }
@@ -858,8 +864,7 @@ const command = (code) => {
           selectedNodes.value,
           true
         );
-        selectedNodes.value = [newNode];
-        selectedEdges.value = [];
+        setSelectionCallback([newNode], []);
         recordAfterGraphMod("rewrite:reverse complementation (-π/2)");
         break;
       }
@@ -868,8 +873,7 @@ const command = (code) => {
         // Pivot
         recordBeforeGraphMod();
         const nodes = grewrite.pivot(selectedEdges.value[0]);
-        selectedEdges.value = [];
-        selectedNodes.value = nodes;
+        setSelectionCallback(nodes, []);
         recordAfterGraphMod("rewrite:pivot");
         break;
       }
@@ -890,10 +894,7 @@ const command = (code) => {
         const select = [];
         gops.forNodeCollectiveNeighborhood(pNodes, (node) => select.push(node));
         gops.deleteNodes(pNodes);
-        selectedNodes.value = select;
-        window.setTimeout(() => {
-          selectedNodes.value = select; // Hack fix
-        }, 0);
+        setSelectionCallback(select, []);
         recordAfterGraphMod("edit:delete");
         break;
       }
@@ -928,8 +929,7 @@ const command = (code) => {
         break;
       case "Escape":
         // Clear selection
-        selectedEdges.value = [];
-        selectedNodes.value = [];
+        setSelectionCallback([], []);
         break;
       case "Undo":
         graphStateUndo();
@@ -939,11 +939,9 @@ const command = (code) => {
         break;
       case "selectAll":
         if (selectedEdges.value.length > 0) {
-          selectedEdges.value = Object.keys(gops.graph.edges);
-          selectedNodes.value = [];
+          setSelectionCallback([], Object.keys(gops.graph.edges));
         } else {
-          selectedEdges.value = [];
-          selectedNodes.value = Object.keys(gops.graph.nodes);
+          setSelectionCallback(Object.keys(gops.graph.nodes), []);
         }
         break;
       case "save":
@@ -973,7 +971,7 @@ const command = (code) => {
   }
   return used;
 };
-const checkCanDoCommand = {
+const checkCanDoCommandEdit = {
   // Edit mode
   n: ref(true),
   b: ref(true),
@@ -1036,6 +1034,8 @@ const checkCanDoCommand = {
     return canDo;
   }),
   clear: computed(() => Object.keys(graphStore.nodes).length >= 1),
+};
+const checkCanDoCommandRewrite = {
   // Rewrite mode
   rRewrite: computed(() => {
     if (selectedEdges.value.length <= 0 && selectedNodes.value.length <= 0) {
@@ -1104,6 +1104,8 @@ const checkCanDoCommand = {
   P2: computed(() => grewrite.revPivotStep2IsValid(selectedNodes.value)),
   P: computed(() => checkCanDoCommand.P1.value || checkCanDoCommand.P2.value),
   O: computed(() => checkCanDoCommand.P),
+};
+const checkCanDoCommandOther = {
   // All modes
   r: computed(() =>
     panelStore.rewriteMode
@@ -1126,6 +1128,11 @@ const checkCanDoCommand = {
   open: ref(true),
   Backquote: ref(true),
 };
+const checkCanDoCommand = {
+  ...checkCanDoCommandEdit,
+  ...checkCanDoCommandRewrite,
+  ...checkCanDoCommandOther,
+};
 
 // Graph edit commands that adjust or use the selections before operating on the
 // graph
@@ -1136,8 +1143,7 @@ const addZNodes = () => {
     for (const edge of selectedEdges.value) {
       newNodes.push(...gops.insertNewNodesAlongEdge(edge, 1)[0]);
     }
-    selectedEdges.value = [];
-    selectedNodes.value = newNodes;
+    setSelectionCallback(newNodes, []);
     return "insert z node";
   } else {
     let x, y;
@@ -1155,7 +1161,7 @@ const addZNodes = () => {
       }
     }
     // For convenience, change the selection to just the new node
-    selectedNodes.value = [node];
+    setSelectionCallback([node], []);
     return "new z node";
   }
 };
@@ -1168,13 +1174,11 @@ const addBoundaryNodes = () => {
       x += styleStore.layout.distance;
       const node = gops.addBoundaryNode(x, y);
       edges.push(gops.addNormalEdge(n, node));
-      selectedNodes.value = [];
-      selectedEdges.value = edges;
+      setSelectionCallback([], edges);
     }
   } else {
     const node = gops.addBoundaryNode();
-    selectedNodes.value = [node];
-    selectedEdges.value = [];
+    setSelectionCallback([node], []);
   }
 };
 
@@ -1187,10 +1191,7 @@ const deleteSelection = (nodes) => {
       select.push(node);
     });
     gops.deleteNodes(nodes);
-    selectedNodes.value = select; // Gets cleared due to the deletion somehow
-    window.setTimeout(() => {
-      selectedNodes.value = select; // Hack fix
-    }, 0);
+    setSelectionCallback(select, []);
     delete paste.pasteContent;
   } else {
     // Delete edges and select their nodes
@@ -1199,15 +1200,13 @@ const deleteSelection = (nodes) => {
       select.push(...gops.nodesOfEdge(edge));
     }
     gops.deleteEdges(selectedEdges.value);
-    selectedEdges.value = [];
-    selectedNodes.value = select;
+    setSelectionCallback(select, []);
   }
 };
 
 const clearGraph = () => {
   gops.deleteNodes(Object.keys(graphStore.nodes));
-  selectedEdges.value = [];
-  selectedNodes.value = [];
+  setSelectionCallback([], []);
 };
 
 const setNodeAngles = () => {
@@ -1254,7 +1253,7 @@ const toggleNodeColors = () => {
       if (!(e instanceof GraphRewriteException)) throw e;
     }
   }
-  selectedNodes.value = nodes;
+  setSelectionCallback(nodes, []);
 };
 
 const cut = (nodes) => {
@@ -1266,6 +1265,7 @@ const cut = (nodes) => {
   return ret;
 };
 const copy = (nodes) => {
+  graphUpdater.writeBackNodePositions();
   const ser = serialize(graphStore, nodes);
   const copyStr = `${window.location.origin}${window.location.pathname}#${ser}`;
   if (copyStr !== paste.pasteContent) {
@@ -1340,8 +1340,7 @@ const paste = (pasteStr) => {
   Object.assign(graphStore.edges, data.edges);
   Object.assign(graphStore.paths, data.paths);
   Object.assign(graphStore.layouts.nodes, data.layouts.nodes);
-  selectedNodes.value = Object.keys(data.nodes);
-  selectedEdges.value = [];
+  setSelectionCallback(Object.keys(data.nodes), []);
   recordAfterGraphMod(`edit:paste`);
   return true;
 };
@@ -1353,14 +1352,12 @@ const reversePivotStep1Or2 = (addPi) => {
     // Pivot step 2
     const edge = grewrite.revPivotStep2(selectedNodes.value, addPi);
     step = 2;
-    selectedEdges.value = [edge];
-    selectedNodes.value = [];
+    setSelectionCallback([], [edge]);
   } else {
     // Pivot step 1
     const node = grewrite.revPivotStep1(selectedNodes.value, addPi);
     step = 1;
-    selectedEdges.value = [];
-    selectedNodes.value = [node];
+    setSelectionCallback([node], []);
   }
   recordAfterGraphMod(`rewrite:reverse pivot (step ${step})`);
 };
@@ -1375,11 +1372,7 @@ const reverseHadamardCancellation = (useX) => {
       if (!(e instanceof GraphRewriteException)) throw e;
     }
   }
-  selectedEdges.value = middleEdges;
-  selectedNodes.value = [];
-  window.setTimeout(() => {
-    selectedEdges.value = middleEdges; // Hack
-  }, 0);
+  setSelectionCallback([], middleEdges);
   recordAfterGraphMod("rewrite:reverse hadamard cancellation");
 };
 
@@ -1420,8 +1413,7 @@ const splitNodes = (useX) => {
       }
     }
   }
-  selectedNodes.value = newNodes;
-  selectedEdges.value = [];
+  setSelectionCallback(newNodes, []);
   recordAfterGraphMod("rewrite:split node");
 };
 

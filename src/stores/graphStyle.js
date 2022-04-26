@@ -8,12 +8,16 @@ import { defineConfigs } from "v-network-graph";
 //const white = "#fff";
 //const hEdgeColor = "#08f";
 //const errorColor = "#fa0";
+//const selNEdgeColor = "#940";
+//const selHEdgeColor = "#d80";
 const greenOp = (opacity) => `rgba(204, 255, 204, ${opacity})`;
 const redOp = (opacity) => `rgba(255, 136, 136, ${opacity})`;
 const blackOp = (opacity) => `rgba(0, 0, 0, ${opacity})`;
 const whiteOp = (opacity) => `rgba(255, 255, 255, ${opacity})`;
 const hEdgeColorOp = (opacity) => `rgba(0, 136, 255, ${opacity})`;
 const errorColorOp = (opacity) => `rgba(255, 170, 0, ${opacity})`;
+const selNEdgeColorOp = (opacity) => `rgba(153, 68, 0, ${opacity})`;
+const selHEdgeColorOp = (opacity) => `rgba(221, 136, 0, ${opacity})`;
 
 const nodeConfig = {
   type: "circle",
@@ -112,7 +116,7 @@ export const useStyleStore = defineStore("graphStyle", {
         }),
       }),
       node: reactive({
-        draggable: true,
+        draggable: (n) => !n.animateOut,
         selectable: false, // Selection manually controlled through events
         normal: nodeConfig,
         hover: nodeConfig,
@@ -156,10 +160,12 @@ export const useStyleStore = defineStore("graphStyle", {
         selected: Object.assign({}, edgeConfig, {
           width: 3,
           color: (n) =>
-            ({
-              normal: "#940",
-              hadamard: "#d80",
-            }[n.zxType] ?? errorColor),
+            ((
+              {
+                normal: selNEdgeColorOp,
+                hadamard: selHEdgeColorOp,
+              }[n.zxType] ?? errorColorOp
+            )(n.opacity ?? 1)),
         }),
         gap: 15,
         margin: 1.5 / 2 - 4 / 2,
@@ -192,7 +198,7 @@ export const useStyleStore = defineStore("graphStyle", {
         forceLayout: false,
         fixBoundaries: true,
         positionFixedByClickWithAltKey: false, // Doesn't really work yet
-        animDuration: 3000, // Milliseconds
+        animDuration: 500, // Milliseconds
       }),
       extra: reactive({
         zoomLevel: 1,

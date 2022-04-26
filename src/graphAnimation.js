@@ -1,22 +1,41 @@
-import { isZero } from "@/angles.js";
+export function AssertionError(msg) {
+  this.message = msg;
+}
+export const assert = (condition, msg) => {
+  if (!condition) {
+    throw new AssertionError(msg);
+  }
+};
 
 export class AnimationState {
-  constructor(graph, nodesInfo, edgesInfo, anglesInfo) {
+  constructor(
+    graph,
+    nodesInfo,
+    edgesInfo,
+    anglesInfo,
+    selectedNodes,
+    selectedEdges
+  ) {
     this.graph = graph;
     this.nodesInfo = nodesInfo;
     this.edgesInfo = edgesInfo;
     this.anglesInfo = anglesInfo;
+    this.selectedNodes = selectedNodes;
+    this.selectedEdges = selectedEdges;
   }
 
   applyAnimationStart() {
     for (const [node, info] of Object.entries(this.nodesInfo.addedBefore)) {
       this.graph.nodes[node] = {
-        ...(this.graph.nodes[node] ?? {}),
+        ...this.graph.nodes[node],
         zxType: info.zxType,
         opacity: info.opacity,
       };
+      if (this.nodesInfo.removedAfter[node]) {
+        this.graph.nodes[node].animateOut = true;
+      }
       this.graph.layouts.nodes[node] = {
-        ...(this.graph.layouts.nodes[node] ?? {}),
+        ...this.graph.layouts.nodes[node],
         x: info.x,
         y: info.y,
       };
@@ -27,20 +46,23 @@ export class AnimationState {
     }
     for (const [edge, info] of Object.entries(this.edgesInfo.addedBefore)) {
       this.graph.edges[edge] = {
-        ...(this.graph.edges[edge] ?? {}),
+        ...this.graph.edges[edge],
         source: info.source,
         target: info.target,
         zxType: info.zxType,
         opacity: info.opacity,
       };
+      if (this.edgesInfo.removedAfter[edge]) {
+        this.graph.edges[edge].animateOut = true;
+      }
     }
     for (const edge of Object.keys(this.edgesInfo.removedBefore)) {
       delete this.graph.edges[edge];
     }
     for (const [node, info] of Object.entries(this.anglesInfo.setAtStart)) {
       this.graph.nodes[node] = {
-        ...this.graph.nodes[node],
-        zxAngle: info.angle && !isZero(info.angle) ? info.angle : undefined,
+        ...(this.graph.nodes[node] ?? assert(false, "node doesn't exist")),
+        zxAngle: info.angle,
       };
     }
   }
@@ -49,28 +71,29 @@ export class AnimationState {
     const weightedAverage = (pair) => pair[0] + progress * (pair[1] - pair[0]);
     for (const [node, info] of Object.entries(this.nodesInfo.animated)) {
       this.graph.nodes[node] = {
-        ...this.graph.nodes[node],
+        ...(this.graph.nodes[node] ?? assert(false, "node doesn't exist")),
         opacity: weightedAverage(info.opacity),
       };
       this.graph.layouts.nodes[node] = {
-        ...this.graph.layouts.nodes[node],
+        ...(this.graph.layouts.nodes[node] ??
+          assert(false, "node doesn't exist")),
         x: weightedAverage(info.x),
         y: weightedAverage(info.y),
       };
     }
     for (const [edge, info] of Object.entries(this.edgesInfo.animated)) {
       this.graph.edges[edge] = {
-        ...this.graph.edges[edge],
+        ...(this.graph.edges[edge] ?? assert(false, "edge doesn't exist")),
         opacity: weightedAverage(info.opacity),
       };
     }
     // Fade old angle out then new angle in
     for (const [node, info] of Object.entries(this.anglesInfo.animated)) {
       let angle, opacity;
-      if (!info.angle[0] || isZero(info.angle[0])) {
+      if (!info.angle[0]) {
         angle = info.angle[1];
         opacity = progress;
-      } else if (!info.angle[1] || isZero(info.angle[1])) {
+      } else if (!info.angle[1]) {
         angle = info.angle[1];
         opacity = 1 - progress;
       } else if (progress < 0.5) {
@@ -81,7 +104,7 @@ export class AnimationState {
         opacity = 2 * progress - 1;
       }
       this.graph.nodes[node] = {
-        ...this.graph.nodes[node],
+        ...(this.graph.nodes[node] ?? assert(false, "node doesn't exist")),
         zxAngle: angle,
         labelOpacity: opacity,
       };
@@ -91,7 +114,7 @@ export class AnimationState {
   applyAnimationEnd() {
     for (const [node, info] of Object.entries(this.anglesInfo.setAtEnd)) {
       this.graph.nodes[node] = {
-        ...(this.graph.nodes[node] ?? {}),
+        ...this.graph.nodes[node],
         zxAngle: info.angle,
       };
     }
@@ -116,6 +139,9 @@ export class AnimationSpec {
     this.changingNodes = {};
     // Map node => { oldAngle, newAngle, fade: true|false }
     this.changingAngles = {};
+    // Arrays of ids
+    this.selectedNodes = [];
+    this.selectedEdges = [];
   }
 
   ////////// Animation queries //////////
@@ -139,7 +165,9 @@ export class AnimationSpec {
       graph,
       this.animatedNodesInfo(),
       this.animatedEdgesInfo(),
-      this.animatedAnglesInfo()
+      this.animatedAnglesInfo(),
+      this.selectedNodes,
+      this.selectedEdges
     );
   }
 
@@ -218,53 +246,6 @@ export class AnimationSpec {
       }
     }
     return { setAtStart, setAtEnd, animated };
-  }
-
-  nodeLocationStartEnd(node) {
-    return [
-      {
-        x: this.changingNodes[node]?.oldX,
-        y: this.changingNodes[node]?.oldY,
-      },
-      {
-        x: this.changingNodes[node]?.newX,
-        y: this.changingNodes[node]?.newY,
-      },
-    ];
-  }
-  nodeOpacityStartEnd(node) {
-    if (this.changingNodes[node]?.out === "fade") {
-      return [1, 0];
-    } else if (this.changingNodes[node]?.into === "fade") {
-      return [0, 1];
-    } else {
-      return [1, 1];
-    }
-  }
-  edgeOpacityStartEnd(edge) {
-    if (this.changingEdges[edge]?.out === "fade") {
-      return [1, 0];
-    } else if (this.changingEdges[edge]?.into === "fade") {
-      return [0, 1];
-    } else {
-      return [1, 1];
-    }
-  }
-  angleFadeStartEnd(node) {
-    if (this.changingAngles[node].fade) {
-      return [
-        this.changingAngles[node].oldAngle,
-        this.changingAngles[node].newAngle,
-      ];
-    } else {
-      return [
-        this.changingAngles[node].oldAngle,
-        this.changingAngles[node].oldAngle,
-      ];
-    }
-  }
-  angleToSetAfter(node) {
-    return this.changingAngles[node].newAngle;
   }
 
   ////////// Log graph changes with animation hints //////////
