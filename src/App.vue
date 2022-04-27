@@ -99,9 +99,13 @@ const zoomToFit = (maxZoom) => {
   }
   styleStore.graph.panToCenter();
   const panelWidth = 200;
-  const { width } = styleStore.graph.svgPanZoom.getSizes();
-  let zoom =
+  const panelHeight = snapshotGraphs.value.length > 0 ? 250 : 50;
+  const { width, height } = styleStore.graph.svgPanZoom.getSizes();
+  const zoom1 =
     width < 4 * panelWidth ? 1 / 1.1 : (width - 2 * panelWidth) / width;
+  const zoom2 =
+    height < 3 * panelHeight ? 1 / 1.1 : (height - panelHeight) / height;
+  const zoom = zoom1 < zoom2 ? zoom1 : zoom2;
   styleStore.graph.svgPanZoom
     .fit()
     .zoomBy(zoom || 1 / 1.1)
@@ -480,7 +484,7 @@ const wereNodesOrEdgesSelected = () => {
     return selectedNodes.value.length > 0 || selectedEdges.value.length > 0;
   }
 };
-undoStore.browserNavigateCallback = (data, outOfHistory) => {
+undoStore.browserNavigateCallback = (data) => {
   // Don't save any changes to node positions
   // Change mode
   if (
@@ -493,11 +497,8 @@ undoStore.browserNavigateCallback = (data, outOfHistory) => {
   // Update graph
   graphStateFullReplace(data);
   wereNodesMoved.value = false;
-  // Update URL with current snapshots
-  if (snapshotGraphs.value.length > 0 && !outOfHistory) {
-    // Write the current list of snapshots into any URL in the undo history
-    //undoStore.updateUrl(data);
-  }
+  // Close any overlays
+  modalVisible.value = false;
 };
 const setSelectionCallback = (selNodes, selEdges, noTimeout) => {
   selectedNodes.value = selNodes;
@@ -721,7 +722,7 @@ const command = (code) => {
         recordAfterGraphMod(`edit:${name}`);
         break;
       }
-      case "N": {
+      case "m": {
         // Add X node instead
         recordBeforeGraphMod();
         const name = addZNodes(true);
@@ -988,7 +989,7 @@ const command = (code) => {
 const checkCanDoCommandEdit = {
   // Edit mode
   n: ref(true),
-  N: ref(true),
+  m: ref(true),
   b: ref(true),
   e: computed(() => selectedNodes.value.length >= 2),
   E: computed(() => {

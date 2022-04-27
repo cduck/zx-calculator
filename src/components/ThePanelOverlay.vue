@@ -399,7 +399,7 @@ watch(
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Create a Z node [N]"
+            tooltip="Create a Z (or X) node [N or M]"
           >
             <ElButton
               class="btn btn100"
