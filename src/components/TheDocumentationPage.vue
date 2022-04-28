@@ -146,7 +146,7 @@ const menuSelected = (index, indexPath, args) => {
             <ElMenuItem index="ref-rewrite:shift+h">Insert Nodes</ElMenuItem>
             <ElMenuItem index="ref-rewrite:j">Remove Degree-2 Node</ElMenuItem>
             <ElMenuItem index="ref-rewrite:shift+j">Split Node</ElMenuItem>
-            <ElMenuItem index="ref-rewrite:c">Complementation</ElMenuItem>
+            <ElMenuItem index="ref-rewrite:c">Local Complementation</ElMenuItem>
             <ElMenuItem index="ref-rewrite:shift+c"
               >Reverse Complementation</ElMenuItem
             >

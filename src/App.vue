@@ -1157,11 +1157,12 @@ const addZNodes = (addX) => {
   if (selectedEdges.value.length > 0) {
     // For convenience, replace each edge with a new connected node
     const newNodes = [];
+    const t = addX ? "x" : "z";
     for (const edge of selectedEdges.value) {
-      newNodes.push(...gops.insertNewNodesAlongEdge(edge, 1)[0]);
+      newNodes.push(...gops.insertNewNodesAlongEdge(edge, 1, undefined, t)[0]);
     }
     setSelectionCallback(newNodes, []);
-    return addX ? "insert x node" : "insert z node";
+    return `insert ${t} node`;
   } else {
     let x, y, x2;
     if (selectedNodes.value.length > 0) {
