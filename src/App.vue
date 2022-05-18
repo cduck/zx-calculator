@@ -131,6 +131,7 @@ onBeforeUnmount(() => {
   styleStore.graph.svg.removeEventListener("dragover", dragOverHandler);
   styleStore.graph.svg.removeEventListener("dragleave", dragLeaveHandler);
   styleStore.graph.svg.removeEventListener("drop", pasteOrDropHandler);
+  styleStore.graph.viewport.removeEventListener("touchstart", touchstartOnce);
   document.removeEventListener("paste", pasteOrDropHandler);
   document.removeEventListener("copy", copyOrCutHandler);
   document.removeEventListener("cut", copyOrCutHandler);
@@ -141,12 +142,20 @@ onMounted(() => {
   styleStore.graph.svg.addEventListener("dragover", dragOverHandler);
   styleStore.graph.svg.addEventListener("dragleave", dragLeaveHandler);
   styleStore.graph.svg.addEventListener("drop", pasteOrDropHandler);
+  styleStore.graph.viewport.addEventListener("touchstart", touchstartOnce);
   if (!window.location.hash) {
     helpVisible.value = true;
   }
   undoStore.load(graphStore.fullCopy());
   wereNodesMoved.value = false;
 });
+
+// Detect touch device (changes selection behavior)
+let noShiftSelect = undefined;
+const touchstartOnce = () => {
+  noShiftSelect = noShiftSelect ?? true;
+  window.removeEventListener("touchstart", touchstartOnce);
+};
 
 // Save some configuration
 const watchConfig = () => {
@@ -628,7 +637,7 @@ const edgeMultiClick = (detail) => {
   const e = detail.event;
   if (!graphStore.edges[detail.edge]) return;
   if (detail.count === 1) {
-    if (e?.shiftKey || e?.metaKey || e?.shiftKey) {
+    if (e?.shiftKey || e?.metaKey || e?.ctrlKey || noShiftSelect) {
       const newEdges = selectedEdges.value.filter((e) => e !== detail.edge);
       if (newEdges.length === selectedEdges.value.length) {
         newEdges.push(detail.edge);
@@ -653,7 +662,7 @@ const nodeMultiClick = (detail) => {
         [],
         true
       );
-    } else if (e.shiftKey || e.metaKey || e.shiftKey) {
+    } else if (e.shiftKey || e.metaKey || e.ctrlKey || noShiftSelect) {
       const newNodes = selectedNodes.value.filter((n) => n !== detail.node);
       if (newNodes.length === selectedNodes.value.length) {
         newNodes.push(detail.node);
