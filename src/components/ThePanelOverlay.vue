@@ -887,7 +887,7 @@ watch(
     @update:visible="(v) => emit('update:helpVisible', v)"
     :noPad="true"
   >
-    <TheDocumentationPage />
+    <TheDocumentationPage @close="emit('update:helpVisible', false)" />
   </ModalOverlay>
 </template>
 

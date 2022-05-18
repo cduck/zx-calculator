@@ -57,13 +57,15 @@ const prevPage = () => {
 const menuSelected = (index, indexPath, args) => {
   console.log("select", args);
 };
+
+const emit = defineEmits(["close"]);
 </script>
 
 <template>
   <ElContainer class="layout-container">
     <ElAside>
       <ElHeader>
-        <ElButton type="text"
+        <ElButton type="text" @click="emit('close')"
           ><ElIcon :size="20"><Close /></ElIcon
         ></ElButton>
         <div style="flex-grow: 1; margin: 0"></div>
