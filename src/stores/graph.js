@@ -14,34 +14,11 @@ const overwriteDict = (oldObj, newObj) => {
 // https://pinia.vuejs.org/introduction.html
 export const useGraphStore = defineStore("graph", {
   state: () => ({
-    nodes: reactive({
-      node1: { zxType: "boundary" },
-      node2: { zxType: "z", zxAngle: "π/2" },
-      node3: { zxType: "boundary" },
-      node4: { zxType: "boundary" },
-      node5: { zxType: "z" },
-      node6: { zxType: "boundary" },
-    }),
-    edges: reactive({
-      edge1: { source: "node1", target: "node2", zxType: "normal" },
-      edge2: { source: "node2", target: "node3", zxType: "normal" },
-      edge3: { source: "node4", target: "node5", zxType: "normal" },
-      edge4: { source: "node5", target: "node6", zxType: "normal" },
-      edge5: { source: "node2", target: "node5", zxType: "hadamard" },
-    }),
-    paths: reactive({
-      path1: { edges: ["edge1", "edge2"] },
-      path2: { edges: ["edge3", "edge4"] },
-    }),
+    nodes: reactive({}),
+    edges: reactive({}),
+    paths: reactive({}),
     layouts: {
-      nodes: reactive({
-        node1: { x: -48, y: 0 },
-        node2: { x: 0, y: 0 },
-        node3: { x: 48, y: 0 },
-        node4: { x: -48, y: 48 },
-        node5: { x: 0, y: 48 },
-        node6: { x: 48, y: 48 },
-      }),
+      nodes: reactive({}),
     },
   }),
   actions: {

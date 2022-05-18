@@ -21,13 +21,13 @@ export class UndoHistory {
     this.counter = 0;
   }
 
-  load() {
+  load(defaultData) {
     if (this.linkToBrowser) {
       if (!this.popStateHandler) {
         this.popStateHandler = (e) => this._onPopState(e);
         window.addEventListener("popstate", this.popStateHandler);
       }
-      this._loadCurrentUrl(true);
+      this._loadCurrentUrl(true, defaultData);
     }
   }
 
@@ -141,25 +141,27 @@ export class UndoHistory {
     e.preventDefault();
   }
 
-  _loadCurrentUrl(clearLocalHistory) {
+  _loadCurrentUrl(clearLocalHistory, defaultData) {
     const serial = decodeURIComponent(window.location.hash.slice(1));
-    if (!serial || serial.length <= 0) {
-      return;
-    }
     let data;
-    try {
-      data = this.deserialize ? this.deserialize(serial) : JSON.parse(serial);
-    } catch (e) {
-      console.error("Graph parse from URL failed:", e.message || e);
-      return;
+    if (serial && serial.length > 0) {
+      try {
+        data = this.deserialize ? this.deserialize(serial) : JSON.parse(serial);
+      } catch (e) {
+        console.error("Graph parse from URL failed:", e.message || e);
+      }
     }
-    this.browserNavigateCallback(data, true);
+    this.browserNavigateCallback(data ?? defaultData, true);
     if (clearLocalHistory) {
       delete this.outOfHistory;
       this.history = [];
       this.currentIndex = -1;
-      this.addEntry(data, "url", true);
-    } else {
+      this.addEntry(
+        data ?? defaultData,
+        data === undefined ? "default" : "url",
+        true
+      );
+    } else if (data !== undefined) {
       this.outOfHistory = data;
     }
   }

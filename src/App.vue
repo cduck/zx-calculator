@@ -144,10 +144,7 @@ onMounted(() => {
   if (!window.location.hash) {
     helpVisible.value = true;
   }
-  undoStore.load();
-  if (undoStore.isEmpty()) {
-    undoStore.insertEntry(makeFullGraphStateCopy(), "init", 0, true);
-  }
+  undoStore.load(graphStore.fullCopy());
   wereNodesMoved.value = false;
 });
 
