@@ -32,10 +32,9 @@ const emit = defineEmits(["update:visible"]);
   display: flex;
   background: rgba(150, 150, 150, 0.5);
   position: absolute;
-  top: -20px;
   left: 0;
   width: 100vw;
-  height: calc(100vh + 40px);
+  height: calc(100vh);
   justify-content: center;
   align-items: left;
   overflow-y: scroll;
@@ -44,12 +43,12 @@ const emit = defineEmits(["update:visible"]);
 }
 
 .modal-mid {
-  max-height: calc(100vh + 40px);
+  max-height: calc(100vh);
 }
 
 .modal-before,
 .modal-after {
-  min-height: 45px;
+  min-height: 25px;
 }
 
 .modal-inner {
