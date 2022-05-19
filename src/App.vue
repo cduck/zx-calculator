@@ -143,11 +143,11 @@ onMounted(() => {
   styleStore.graph.svg.addEventListener("dragleave", dragLeaveHandler);
   styleStore.graph.svg.addEventListener("drop", pasteOrDropHandler);
   styleStore.graph.viewport.addEventListener("touchstart", touchstartOnce);
-  if (!window.location.hash) {
-    helpVisible.value = true;
-  }
   undoStore.load(graphStore.fullCopy());
   wereNodesMoved.value = false;
+  if (Object.keys(graphStore.nodes).length <= 0) {
+    helpVisible.value = true;
+  }
 });
 
 // Detect touch device (changes selection behavior)
