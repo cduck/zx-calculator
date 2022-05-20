@@ -188,6 +188,25 @@ const menuSelected = (index) => {
   }
 };
 
+const contentClick = (e) => {
+  let elem = e.target;
+  while (elem && elem.tagName.toLowerCase() !== "a") {
+    elem = elem.parentElement;
+  }
+  if (!elem) return;
+  if (elem.host === window.location.host || elem.host === "zx.cduck.me") {
+    loadGraph(elem.hash);
+    e.preventDefault();
+  }
+};
+
+const loadGraph = (serial) => {
+  if (serial && typeof serial === "string" && serial !== "#") {
+    window.location.hash = serial;
+  }
+  emit("close");
+};
+
 const emit = defineEmits(["close"]);
 </script>
 
@@ -411,7 +430,7 @@ const emit = defineEmits(["close"]);
           </ElButton>
         </ElHeader>
         <ElMain ref="docContent">
-          <component :is="contentComponentType" />
+          <component :is="contentComponentType" @click="contentClick" />
         </ElMain>
         <ElFooter>
           <ElButton
