@@ -1,5 +1,12 @@
 <script setup>
-import { ref, computed, onBeforeMount, onBeforeUnmount } from "vue";
+import {
+  ref,
+  shallowRef,
+  computed,
+  onBeforeMount,
+  onMounted,
+  onBeforeUnmount,
+} from "vue";
 import {
   ElContainer,
   ElAside,
@@ -30,13 +37,19 @@ import {
 } from "@element-plus/icons-vue";
 import ArrowUpRightFromSquare from "@/icons/ArrowUpRightFromSquare.vue";
 import MenuBars from "@/icons/MenuBars.vue";
-import IntroMd from "@/doc/IntroMd.md";
+import { default as WelcomePage } from "@/doc/welcome.md";
 import "github-markdown-css/github-markdown-light.css";
 
 const narrowScreenMediaQuery = "(max-width: 700px)";
 const showMenu = ref(false);
 const narrowScreen = ref(false);
+const docContent = ref(null);
 let windowMatchMedia;
+const menuComponent = ref(null);
+const menuInfo = {};
+const menuItemComponents = {};
+const currentSelected = ref(null);
+let contentComponentType = shallowRef(WelcomePage);
 
 // Life cycle listeners
 onBeforeMount(() => {
@@ -44,33 +57,132 @@ onBeforeMount(() => {
   narrowScreen.value = windowMatchMedia.matches;
   windowMatchMedia.addEventListener("change", screenChange);
 });
+onMounted(() => {
+  menuInfo.defaultOpeneds = menuComponent.value.$props.defaultOpeneds;
+  menuInfo.uniqueOpened = menuComponent.value.$props.uniqueOpened;
+  menuInfo.rootList = [];
+  menuInfo.rootMap = {};
+  menuInfo.globalList = [];
+  for (const item of menuComponent.value.$slots.default()) {
+    buildMenuInfo(
+      item,
+      menuInfo.rootList,
+      menuInfo.globalList,
+      menuInfo.rootMap,
+      []
+    );
+  }
+  currentSelected.value = menuComponent.value.$props.defaultActive;
+});
 onBeforeUnmount(() => {
   windowMatchMedia.removeEventListener("change", screenChange);
 });
+
+const buildMenuInfo = (component, appendTo, globalList, keyTo, path) => {
+  let title = component?.props?.title;
+  const titleSlot =
+    component?.type?.name === "ElMenuItem"
+      ? component?.children?.default
+      : component?.children?.title;
+  if (!title && titleSlot) {
+    title = "";
+    for (const child of titleSlot()) {
+      if (typeof child.children === "string") {
+        title += child.children;
+      }
+    }
+    if (!title) title = undefined;
+  }
+  if (component?.type?.name === "ElSubMenu") {
+    const subList = [];
+    for (const subItem of component.children.default()) {
+      const subPath = [...path, component.props.index];
+      buildMenuInfo(subItem, subList, globalList, keyTo, subPath);
+    }
+    const info = {
+      id: component.props.index,
+      path: [...path, component.props.index],
+      title: title,
+      children: subList,
+    };
+    appendTo.push(info);
+    keyTo[info.id] = info;
+  } else if (component?.type?.name === "ElMenuItem") {
+    const info = {
+      id: component.props.index,
+      path: [...path, component.props.index],
+      title: title,
+      pageName: component.props.index,
+      index: globalList.length,
+    };
+    appendTo.push(info);
+    globalList.push(info);
+    keyTo[info.id] = info;
+  } else if (component?.type?.name === "ElMenuItemGroup") {
+    for (const subItem of component.children.default()) {
+      buildMenuInfo(subItem, appendTo, globalList, keyTo, path);
+    }
+  } else {
+    console.warn("Unknown tag", component?.type?.name);
+  }
+};
+
 const screenChange = () => {
   narrowScreen.value = windowMatchMedia.matches;
 };
 
+const itemChange = (el) => {
+  menuItemComponents[el?.$props?.index] = el;
+};
+
 const nextName = computed(() => {
-  return "Next";
+  if (!currentSelected.value) return null;
+  const i = menuInfo.rootMap[currentSelected.value].index + 1;
+  if (!menuInfo.globalList[i]) return null;
+  return menuInfo.globalList[i].title;
 });
 const prevName = computed(() => {
-  return "Previous";
+  if (!currentSelected.value) return null;
+  const i = menuInfo.rootMap[currentSelected.value].index - 1;
+  if (!menuInfo.globalList[i]) return null;
+  return menuInfo.globalList[i].title;
 });
 const openExternalLink = computed(() => {
-  return "https://github.com/cduck/";
+  if (!currentSelected.value) return "";
+  const fname = menuInfo.rootMap[currentSelected.value].pageName;
+  return `https://github.com/cduck/zx-calculator/blob/main/src/doc/${fname}.md`;
 });
 
 const nextPage = () => {
-  //
+  goToPageOffset(1);
 };
-
 const prevPage = () => {
-  //
+  goToPageOffset(-1);
+};
+const goToPageOffset = (offset) => {
+  if (!currentSelected.value) return null;
+  const i = menuInfo.rootMap[currentSelected.value].index + offset;
+  if (!menuInfo.globalList[i]) return null;
+  const info = menuInfo.globalList[i];
+  menuItemComponents[info.id].handleClick();
 };
 
-const menuSelected = (index, indexPath, args) => {
-  console.log("select", args);
+const menuSelected = (index) => {
+  // Record selection
+  currentSelected.value = index;
+  // Scroll
+  if (narrowScreen.value) {
+    showMenu.value = false;
+    docContent.value.$el.scrollIntoView();
+  }
+  // Load content
+  if (index === "welcome") {
+    contentComponentType.value = WelcomePage;
+  } else {
+    import(`../doc/${index}.md`).then((loaded) => {
+      contentComponentType.value = loaded.default;
+    });
+  }
 };
 
 const emit = defineEmits(["close"]);
@@ -114,108 +226,166 @@ const emit = defineEmits(["close"]);
         </ElHeader>
         <ElMenu
           :default-openeds="['topics']"
+          :unique-opened="true"
           default-active="welcome"
           background-color="#fcfcfc"
           @select="menuSelected"
+          ref="menuComponent"
         >
           <ElSubMenu index="topics">
-            <template #title>
-              <ElIcon><Reading /></ElIcon>ZX Calculator
-            </template>
-            <ElMenuItem index="welcome">
-              <ElIcon><Sunrise /></ElIcon>Welcome
-            </ElMenuItem>
-            <ElMenuItem index="zxintro">
-              <ElIcon><Guide /></ElIcon>ZX Calculus Intro
-            </ElMenuItem>
-            <ElMenuItem index="graphlike">
-              <ElIcon><Share /></ElIcon>Graph-Like Diagrams
-            </ElMenuItem>
-            <ElMenuItem index="edit">
-              <ElIcon><Edit /></ElIcon>Graph Editing
-            </ElMenuItem>
-            <ElMenuItem index="rewrite">
-              <ElIcon><MagicStick /></ElIcon>Graph Rewrite
-            </ElMenuItem>
-            <ElMenuItem index="export">
-              <ElIcon><FolderOpened /></ElIcon>Import &amp; Export
-            </ElMenuItem>
+            <template #title
+              ><ElIcon><Reading /></ElIcon>ZX Calculator</template
+            >
+            <ElMenuItem index="welcome" :ref="itemChange"
+              ><ElIcon><Sunrise /></ElIcon>Welcome</ElMenuItem
+            >
+            <ElMenuItem index="zxintro" :ref="itemChange"
+              ><ElIcon><Guide /></ElIcon>ZX Calculus Intro</ElMenuItem
+            >
+            <ElMenuItem index="graphlike" :ref="itemChange"
+              ><ElIcon><Share /></ElIcon>Graph-Like Diagrams</ElMenuItem
+            >
+            <ElMenuItem index="edit" :ref="itemChange"
+              ><ElIcon><Edit /></ElIcon>Graph Editing</ElMenuItem
+            >
+            <ElMenuItem index="rewrite" :ref="itemChange"
+              ><ElIcon><MagicStick /></ElIcon>Graph Rewrite</ElMenuItem
+            >
+            <ElMenuItem index="export" :ref="itemChange"
+              ><ElIcon><FolderOpened /></ElIcon>Import &amp; Export</ElMenuItem
+            >
           </ElSubMenu>
           <ElSubMenu index="ref">
-            <template #title>
-              <ElIcon><Tickets /></ElIcon>Reference
-            </template>
+            <template #title
+              ><ElIcon><Tickets /></ElIcon>Reference</template
+            >
             <ElSubMenu index="ref-menu">
-              <template #title>
-                <ElIcon><SetUp /></ElIcon>Toolbar
-              </template>
-              <ElMenuItem index="ref-menu:hide">Hide &amp; Show</ElMenuItem>
-              <ElMenuItem index="ref-menu:mode">Graph Mode</ElMenuItem>
-              <ElMenuItem index="ref-menu:undo">Undo History</ElMenuItem>
-              <ElMenuItem index="ref-menu:snapshot">Snapshots</ElMenuItem>
-              <ElMenuItem index="ref-menu:import">Import</ElMenuItem>
-              <ElMenuItem index="ref-menu:export">Export</ElMenuItem>
-              <ElMenuItem index="ref-menu:screenshot">Screenshot</ElMenuItem>
-              <ElMenuItem index="ref-menu:documentation"
+              <template #title
+                ><ElIcon><SetUp /></ElIcon>Toolbar</template
+              >
+              <ElMenuItem index="menu-hide" :ref="itemChange"
+                >Hide &amp; Show</ElMenuItem
+              >
+              <ElMenuItem index="menu-mode" :ref="itemChange"
+                >Graph Mode</ElMenuItem
+              >
+              <ElMenuItem index="menu-undo" :ref="itemChange"
+                >Undo History</ElMenuItem
+              >
+              <ElMenuItem index="menu-snapshot" :ref="itemChange"
+                >Snapshots</ElMenuItem
+              >
+              <ElMenuItem index="menu-import" :ref="itemChange"
+                >Import</ElMenuItem
+              >
+              <ElMenuItem index="menu-export" :ref="itemChange"
+                >Export</ElMenuItem
+              >
+              <ElMenuItem index="menu-screenshot" :ref="itemChange"
+                >Screenshot</ElMenuItem
+              >
+              <ElMenuItem index="menu-documentation" :ref="itemChange"
                 >Documentation</ElMenuItem
               >
-              <ElMenuItem index="ref-menu:version">Version</ElMenuItem>
+              <ElMenuItem index="menu-version" :ref="itemChange"
+                >Version</ElMenuItem
+              >
             </ElSubMenu>
             <ElSubMenu index="ref-edit">
-              <template #title>
-                <ElIcon><Edit /></ElIcon>Edit Commands
-              </template>
-              <ElMenuItem index="ref-edit:clear">Clear Graph</ElMenuItem>
-              <ElMenuItem index="ref-edit:b">New Boundary</ElMenuItem>
-              <ElMenuItem index="ref-edit:n">New Node</ElMenuItem>
-              <ElMenuItem index="ref-edit:e">Toggle Edges</ElMenuItem>
-              <ElMenuItem index="ref-edit:shift+e">Clear Edges</ElMenuItem>
-              <ElMenuItem index="ref-edit:a">Set Angle</ElMenuItem>
-              <ElMenuItem index="ref-edit:shift+a">Add Angle</ElMenuItem>
-              <ElMenuItem index="ref-edit:r">Toggle Color</ElMenuItem>
-              <ElMenuItem index="ref-edit:x">Delete</ElMenuItem>
-              <ElMenuItem index="ref-edit:s">Define Path</ElMenuItem>
-              <ElMenuItem index="ref-edit:shift+s">Clear Path</ElMenuItem>
+              <template #title
+                ><ElIcon><Edit /></ElIcon>Edit Commands</template
+              >
+              <ElMenuItem index="edit-clear" :ref="itemChange"
+                >Clear Graph</ElMenuItem
+              >
+              <ElMenuItem index="edit-b" :ref="itemChange"
+                >New Boundary</ElMenuItem
+              >
+              <ElMenuItem index="edit-n" :ref="itemChange">New Node</ElMenuItem>
+              <ElMenuItem index="edit-e" :ref="itemChange"
+                >Toggle Edges</ElMenuItem
+              >
+              <ElMenuItem index="edit-shift+e" :ref="itemChange"
+                >Clear Edges</ElMenuItem
+              >
+              <ElMenuItem index="edit-a" :ref="itemChange"
+                >Set Angle</ElMenuItem
+              >
+              <ElMenuItem index="edit-shift+a" :ref="itemChange"
+                >Add Angle</ElMenuItem
+              >
+              <ElMenuItem index="edit-r" :ref="itemChange"
+                >Toggle Color</ElMenuItem
+              >
+              <ElMenuItem index="edit-x" :ref="itemChange">Delete</ElMenuItem>
+              <ElMenuItem index="edit-s" :ref="itemChange"
+                >Define Path</ElMenuItem
+              >
+              <ElMenuItem index="edit-shift+s" :ref="itemChange"
+                >Clear Path</ElMenuItem
+              >
             </ElSubMenu>
             <ElSubMenu index="ref-rewrite">
-              <template #title>
-                <ElIcon><MagicStick /></ElIcon>Rewrite Commands
-              </template>
-              <ElMenuItem index="ref-rewrite:r">Toggle Color</ElMenuItem>
-              <ElMenuItem index="ref-rewrite:h"
+              <template #title
+                ><ElIcon><MagicStick /></ElIcon>Rewrite Commands</template
+              >
+              <ElMenuItem index="rewrite-r" :ref="itemChange"
+                >Toggle Color</ElMenuItem
+              >
+              <ElMenuItem index="rewrite-h" :ref="itemChange"
                 >Remove Edge (+ Nodes)</ElMenuItem
               >
-              <ElMenuItem index="ref-rewrite:shift+h">Insert Nodes</ElMenuItem>
-              <ElMenuItem index="ref-rewrite:j"
+              <ElMenuItem index="rewrite-shift+h" :ref="itemChange"
+                >Insert Nodes</ElMenuItem
+              >
+              <ElMenuItem index="rewrite-j" :ref="itemChange"
                 >Remove Degree-2 Node</ElMenuItem
               >
-              <ElMenuItem index="ref-rewrite:shift+j">Split Node</ElMenuItem>
-              <ElMenuItem index="ref-rewrite:c"
+              <ElMenuItem index="rewrite-shift+j" :ref="itemChange"
+                >Split Node</ElMenuItem
+              >
+              <ElMenuItem index="rewrite-c" :ref="itemChange"
                 >Local Complementation</ElMenuItem
               >
-              <ElMenuItem index="ref-rewrite:shift+c"
+              <ElMenuItem index="rewrite-shift+c" :ref="itemChange"
                 >Reverse Complementation</ElMenuItem
               >
-              <ElMenuItem index="ref-rewrite:p">Pivot</ElMenuItem>
-              <ElMenuItem index="ref-rewrite:shift+p">Reverse Pivot</ElMenuItem>
+              <ElMenuItem index="rewrite-p" :ref="itemChange">Pivot</ElMenuItem>
+              <ElMenuItem index="rewrite-shift+p" :ref="itemChange"
+                >Reverse Pivot</ElMenuItem
+              >
             </ElSubMenu>
             <ElSubMenu index="ref-view">
-              <template #title>
-                <ElIcon><View /></ElIcon>View Options
-              </template>
+              <template #title
+                ><ElIcon><View /></ElIcon>View Options</template
+              >
               <ElMenuItemGroup title="View">
-                <ElMenuItem index="ref-view:view-fit">Zoom to Fit</ElMenuItem>
-                <ElMenuItem index="ref-view:view-reset">Reset View</ElMenuItem>
-                <ElMenuItem index="ref-view:grid-realign"
+                <ElMenuItem index="view-view-fit" :ref="itemChange"
+                  >Zoom to Fit</ElMenuItem
+                >
+                <ElMenuItem index="view-view-reset" :ref="itemChange"
+                  >Reset View</ElMenuItem
+                >
+                <ElMenuItem index="view-grid-realign" :ref="itemChange"
                   >Realign to Grid</ElMenuItem
                 >
-                <ElMenuItem index="ref-view:grid-show">Show Grid</ElMenuItem>
-                <ElMenuItem index="ref-view:grid-snap">Snap to Grid</ElMenuItem>
-                <ElMenuItem index="ref-view:scale">Scale Nodes</ElMenuItem>
+                <ElMenuItem index="view-grid-show" :ref="itemChange"
+                  >Show Grid</ElMenuItem
+                >
+                <ElMenuItem index="view-grid-snap" :ref="itemChange"
+                  >Snap to Grid</ElMenuItem
+                >
+                <ElMenuItem index="view-scale" :ref="itemChange"
+                  >Scale Nodes</ElMenuItem
+                >
               </ElMenuItemGroup>
               <ElMenuItemGroup title="Force Simulation">
-                <ElMenuItem index="ref-view:">Relax Nodes</ElMenuItem>
-                <ElMenuItem index="ref-view:">Fix Boundaries</ElMenuItem>
+                <ElMenuItem index="view-relax-nodes" :ref="itemChange"
+                  >Relax Nodes</ElMenuItem
+                >
+                <ElMenuItem index="view-fix-boundaries" :ref="itemChange"
+                  >Fix Boundaries</ElMenuItem
+                >
               </ElMenuItemGroup>
             </ElSubMenu>
           </ElSubMenu>
@@ -237,8 +407,8 @@ const emit = defineEmits(["close"]);
             {{ nextName }}<ElIcon class="el-icon--right"><ArrowRight /></ElIcon>
           </ElButton>
         </ElHeader>
-        <ElMain>
-          <IntroMd />
+        <ElMain ref="docContent">
+          <component :is="contentComponentType" />
         </ElMain>
         <ElFooter>
           <ElButton

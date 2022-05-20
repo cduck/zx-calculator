@@ -9,6 +9,7 @@ import {
   ElTooltip,
   ElAutocomplete,
   ElUpload,
+  ElLink,
 } from "element-plus";
 import {
   ArrowDownBold,
@@ -349,7 +350,15 @@ watch(
             @click="emit('update:helpVisible', !helpVisible)"
             title="Documentation"
           />
-          <div class="version" :innerText="`v${version} ${versionKind}`"></div>
+          <div class="version">
+            <ElLink
+              type="info"
+              href="https://github.com/cduck/zx-calculator"
+              target="_blank"
+              rel="noopener"
+              :innerText="`v${version} ${versionKind}`"
+            ></ElLink>
+          </div>
         </div>
       </div>
     </Transition>
@@ -1066,9 +1075,6 @@ watch(
 }
 a.btn {
   text-decoration: none;
-}
-.version {
-  color: #999;
 }
 
 .snapshot-move,
