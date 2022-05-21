@@ -326,33 +326,37 @@ const emit = defineEmits(["close"]);
               <template #title
                 ><ElIcon><Edit /></ElIcon>Edit Commands</template
               >
-              <ElMenuItem index="edit-clear" :ref="itemChange"
+              <ElMenuItem index="edit-clear-graph" :ref="itemChange"
                 >Clear Graph</ElMenuItem
               >
-              <ElMenuItem index="edit-b" :ref="itemChange"
+              <ElMenuItem index="edit-new-boundary" :ref="itemChange"
                 >New Boundary</ElMenuItem
               >
-              <ElMenuItem index="edit-n" :ref="itemChange">New Node</ElMenuItem>
-              <ElMenuItem index="edit-e" :ref="itemChange"
+              <ElMenuItem index="edit-new-node" :ref="itemChange"
+                >New Node</ElMenuItem
+              >
+              <ElMenuItem index="edit-toggle-edges" :ref="itemChange"
                 >Toggle Edges</ElMenuItem
               >
-              <ElMenuItem index="edit-shift+e" :ref="itemChange"
+              <ElMenuItem index="edit-clear-edges" :ref="itemChange"
                 >Clear Edges</ElMenuItem
               >
-              <ElMenuItem index="edit-a" :ref="itemChange"
+              <ElMenuItem index="edit-set-angle" :ref="itemChange"
                 >Set Angle</ElMenuItem
               >
-              <ElMenuItem index="edit-shift+a" :ref="itemChange"
+              <ElMenuItem index="edit-add-angle" :ref="itemChange"
                 >Add Angle</ElMenuItem
               >
-              <ElMenuItem index="edit-r" :ref="itemChange"
+              <ElMenuItem index="edit-toggle-color" :ref="itemChange"
                 >Toggle Color</ElMenuItem
               >
-              <ElMenuItem index="edit-x" :ref="itemChange">Delete</ElMenuItem>
-              <ElMenuItem index="edit-s" :ref="itemChange"
+              <ElMenuItem index="edit-delete" :ref="itemChange"
+                >Delete</ElMenuItem
+              >
+              <ElMenuItem index="edit-define-path" :ref="itemChange"
                 >Define Path</ElMenuItem
               >
-              <ElMenuItem index="edit-shift+s" :ref="itemChange"
+              <ElMenuItem index="edit-clear-path" :ref="itemChange"
                 >Clear Path</ElMenuItem
               >
             </ElSubMenu>
@@ -360,29 +364,31 @@ const emit = defineEmits(["close"]);
               <template #title
                 ><ElIcon><MagicStick /></ElIcon>Rewrite Commands</template
               >
-              <ElMenuItem index="rewrite-r" :ref="itemChange"
+              <ElMenuItem index="rewrite-toggle-color" :ref="itemChange"
                 >Toggle Color</ElMenuItem
               >
-              <ElMenuItem index="rewrite-h" :ref="itemChange"
+              <ElMenuItem index="rewrite-remove-edge" :ref="itemChange"
                 >Remove Edge (and Nodes)</ElMenuItem
               >
-              <ElMenuItem index="rewrite-shift+h" :ref="itemChange"
-                >Insert Nodes</ElMenuItem
+              <ElMenuItem index="rewrite-insert-node" :ref="itemChange"
+                >Insert Node</ElMenuItem
               >
-              <ElMenuItem index="rewrite-j" :ref="itemChange"
+              <ElMenuItem index="rewrite-remove-deg2" :ref="itemChange"
                 >Remove Degree-2 Node</ElMenuItem
               >
-              <ElMenuItem index="rewrite-shift+j" :ref="itemChange"
+              <ElMenuItem index="rewrite-split-node" :ref="itemChange"
                 >Split Node</ElMenuItem
               >
-              <ElMenuItem index="rewrite-c" :ref="itemChange"
+              <ElMenuItem index="rewrite-complementation" :ref="itemChange"
                 >Local Complementation</ElMenuItem
               >
-              <ElMenuItem index="rewrite-shift+c" :ref="itemChange"
+              <ElMenuItem index="rewrite-rev-complementation" :ref="itemChange"
                 >Reverse Complementation</ElMenuItem
               >
-              <ElMenuItem index="rewrite-p" :ref="itemChange">Pivot</ElMenuItem>
-              <ElMenuItem index="rewrite-shift+p" :ref="itemChange"
+              <ElMenuItem index="rewrite-pivot" :ref="itemChange"
+                >Pivot</ElMenuItem
+              >
+              <ElMenuItem index="rewrite-rev-pivot" :ref="itemChange"
                 >Reverse Pivot</ElMenuItem
               >
             </ElSubMenu>
