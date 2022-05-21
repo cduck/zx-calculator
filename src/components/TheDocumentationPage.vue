@@ -38,7 +38,10 @@ import {
 import ArrowUpRightFromSquare from "@/icons/ArrowUpRightFromSquare.vue";
 import MenuBars from "@/icons/MenuBars.vue";
 import { default as WelcomePage } from "@/doc/welcome.md";
+
+// Documentation CSS
 import "github-markdown-css/github-markdown-light.css";
+import "prismjs/themes/prism.css";
 
 const narrowScreenMediaQuery = "(max-width: 700px)";
 const showMenu = ref(false);

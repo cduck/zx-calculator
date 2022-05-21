@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from "url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import markdown from "vite-plugin-md";
+import prism from "markdown-it-prism";
 
 import base from "./vite.base.js";
 
@@ -12,7 +13,13 @@ export default defineConfig({
     vue({
       include: [/\.vue$/, /\.md$/],
     }),
-    markdown(),
+    markdown({
+      markdownItOptions: {
+        html: true,
+        typographer: false,
+      },
+      markdownItUses: [prism],
+    }),
   ],
   resolve: {
     alias: {
