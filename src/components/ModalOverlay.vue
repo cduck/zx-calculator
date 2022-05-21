@@ -52,7 +52,6 @@ const emit = defineEmits(["update:visible"]);
 }
 
 .modal-inner {
-  min-width: 300px;
   padding: 10px 20px;
   background-color: rgba(255, 255, 255, 0.8);
   border-radius: 8px;

@@ -1170,6 +1170,7 @@ a.btn {
 .import-export {
   text-align: center;
   width: calc(100vw - 200px);
+  min-width: 280px;
 }
 @media (min-width: 1060px) {
   .import-export {

@@ -53,6 +53,9 @@ const menuInfo = {};
 const menuItemComponents = {};
 const currentSelected = ref(null);
 let contentComponentType = shallowRef(WelcomePage);
+const welcomeSelected = computed(
+  () => contentComponentType.value === WelcomePage
+);
 
 // Life cycle listeners
 onBeforeMount(() => {
@@ -430,7 +433,9 @@ const emit = defineEmits(["close"]);
       </ElAside>
 
       <ElContainer>
-        <ElHeader class="prev-next-header">
+        <ElHeader class="prev-next-header min-header" v-show="welcomeSelected">
+        </ElHeader>
+        <ElHeader class="prev-next-header" v-show="!welcomeSelected">
           <ElButton
             type="text"
             :icon="ArrowLeft"
@@ -468,12 +473,16 @@ const emit = defineEmits(["close"]);
 
 <style>
 .layout-container {
-  min-width: calc(100vw - 60px);
+  width: calc(100vw - 60px);
+  min-width: 320px;
+  max-width: calc(100vw - 60px);
   background-color: #fff;
 }
 @media (min-width: 1060px) {
   .layout-container {
-    width: calc(1000px);
+    width: 1000px;
+    min-width: 1000px;
+    max-width: 1000px;
   }
 }
 .layout-container > .el-header {
@@ -509,6 +518,9 @@ const emit = defineEmits(["close"]);
 .layout-container .el-footer > * {
   margin-top: auto;
   margin-bottom: auto;
+}
+.layout-container .prev-next-header.min-header {
+  max-height: 30px;
 }
 .layout-container .el-aside .el-header {
   background: #fcfcfc;
