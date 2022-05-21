@@ -271,7 +271,7 @@ const emit = defineEmits(["close"]);
               ><ElIcon><Sunrise /></ElIcon>Welcome</ElMenuItem
             >
             <ElMenuItem index="zxintro" :ref="itemChange"
-              ><ElIcon><Guide /></ElIcon>ZX Calculus Intro</ElMenuItem
+              ><ElIcon><Guide /></ElIcon>ZX-Calculus Reference</ElMenuItem
             >
             <ElMenuItem index="graphlike" :ref="itemChange"
               ><ElIcon><Share /></ElIcon>Graph-Like Diagrams</ElMenuItem
@@ -364,7 +364,7 @@ const emit = defineEmits(["close"]);
                 >Toggle Color</ElMenuItem
               >
               <ElMenuItem index="rewrite-h" :ref="itemChange"
-                >Remove Edge (+ Nodes)</ElMenuItem
+                >Remove Edge (and Nodes)</ElMenuItem
               >
               <ElMenuItem index="rewrite-shift+h" :ref="itemChange"
                 >Insert Nodes</ElMenuItem
