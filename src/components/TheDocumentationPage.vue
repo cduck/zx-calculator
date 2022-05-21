@@ -167,7 +167,10 @@ const goToPageOffset = (offset) => {
   const i = menuInfo.rootMap[currentSelected.value].index + offset;
   if (!menuInfo.globalList[i]) return null;
   const info = menuInfo.globalList[i];
-  menuItemComponents[info.id].handleClick();
+  goToPage(info.id);
+};
+const goToPage = (id) => {
+  menuItemComponents[id].handleClick();
 };
 
 const menuSelected = (index) => {
@@ -195,8 +198,14 @@ const contentClick = (e) => {
   }
   if (!elem) return;
   if (elem.host === window.location.host || elem.host === "zx.cduck.me") {
-    loadGraph(elem.hash);
-    e.preventDefault();
+    const docLinkMatch = /([^/]+)\.md$/i.exec(elem.pathname);
+    if (docLinkMatch) {
+      goToPage(docLinkMatch[1]);
+      e.preventDefault();
+    } else {
+      loadGraph(elem.hash);
+      e.preventDefault();
+    }
   }
 };
 
