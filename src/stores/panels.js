@@ -7,5 +7,6 @@ export const usePanelStore = defineStore("panel", {
     angleToSet: "",
     angleToAdd: "",
     angleToSplit: "",
+    inlineHelpVisible: false,
   }),
 });

@@ -24,6 +24,7 @@ import {
   Grid,
   CircleClose,
 } from "@element-plus/icons-vue";
+import popper from "popperjs";
 import ModalOverlay from "@/components/ModalOverlay.vue";
 import GraphPreview from "@/components/GraphPreview.vue";
 import TheDocumentationPage from "@/components/TheDocumentationPage.vue";
@@ -225,6 +226,32 @@ const snapshotLabelFocus = (e) => {
   e.target.select();
 };
 
+const help = (docTarget) => {
+  return panelStore.inlineHelpVisible ? docTarget : null;
+};
+const vHelpDoc = (el, binding) => {
+  const target = binding.value;
+  if (target && !el.querySelector(".inline-help")) {
+    console.log(el);
+    const div = document.createElement("div");
+    div.classList.add("inline-help");
+    const btn = document.createElement("div");
+    //btn.style = "position: absolute; left: -0.4em; color: #fff; min-width: 1.5em; max-width: 3.5em; height: 1.5em; min-height: 1.5em, max-height: 1.5em; border-radius: 10em; background: rgba(64,158,255,1); text-align: center; line-height: 1.5em";
+    div.style = "position: absolute; left: -0.4em;";
+    btn.innerHTML = `<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" data-v-78e17ca8=""><path fill="currentColor" d="M512 64a448 448 0 1 1 0 896.064A448 448 0 0 1 512 64zm67.2 275.072c33.28 0 60.288-23.104 60.288-57.344s-27.072-57.344-60.288-57.344c-33.28 0-60.16 23.104-60.16 57.344s26.88 57.344 60.16 57.344zM590.912 699.2c0-6.848 2.368-24.64 1.024-34.752l-52.608 60.544c-10.88 11.456-24.512 19.392-30.912 17.28a12.992 12.992 0 0 1-8.256-14.72l87.68-276.992c7.168-35.136-12.544-67.2-54.336-71.296-44.096 0-108.992 44.736-148.48 101.504 0 6.784-1.28 23.68.064 33.792l52.544-60.608c10.88-11.328 23.552-19.328 29.952-17.152a12.8 12.8 0 0 1 7.808 16.128L388.48 728.576c-10.048 32.256 8.96 63.872 55.04 71.04 67.84 0 107.904-43.648 147.456-100.416z"></path></svg>`;
+    btn.addEventListener("click", (e) => {
+      console.log(target);
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    div.appendChild(btn);
+    el.appendChild(div);
+              //<ElIcon style="color: ; position: absolute"><Opportunity /></ElIcon>
+  } else if (!target) {
+    el.querySelector(".inline-help")?.remove();
+  }
+};
+
 const props = defineProps({
   checkCanDoCommand: Object,
   snapshotGraphs: Array,
@@ -334,22 +361,53 @@ watch(
             >
               Export
             </ElButton>
+            <a
+              class="btn el-button"
+              :href="oldSaveImageUrl"
+              target="_blank"
+              rel="noopener"
+              @click="saveImage()"
+              title="Screenshot"
+            >
+              <ElIcon><Camera /></ElIcon>
+            </a>
           </ElButtonGroup>
-          <a
-            class="btn"
-            :href="oldSaveImageUrl"
-            target="_blank"
-            rel="noopener"
-            @click="saveImage()"
-          >
-            <ElButton :icon="Camera" title="Screenshot" />
-          </a>
-          <ElButton
-            class="btn"
-            :icon="Reading"
-            @click="emit('update:helpVisible', !helpVisible)"
-            title="Documentation"
-          />
+          <ElButtonGroup>
+            <ElButton
+              class="btn"
+              :icon="Reading"
+              @click="emit('update:helpVisible', !helpVisible)"
+              title="Documentation"
+            />
+            <ElButton
+              class="btn"
+              @click="
+                panelStore.inlineHelpVisible = !panelStore.inlineHelpVisible
+              "
+              :title="panelStore.inlineHelpVisible ? 'Hide Help' : 'Show Help'"
+            >
+              <ElIcon
+                ><svg
+                  v-show="!panelStore.inlineHelpVisible"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 512 512"
+                >
+                  <!--! Font Awesome Pro 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2022 Fonticons, Inc. -->
+                  <path
+                    d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM256 464c-114.7 0-208-93.31-208-208S141.3 48 256 48s208 93.31 208 208S370.7 464 256 464zM256 336c-18 0-32 14-32 32s13.1 32 32 32c17.1 0 32-14 32-32S273.1 336 256 336zM289.1 128h-51.1C199 128 168 159 168 198c0 13 11 24 24 24s24-11 24-24C216 186 225.1 176 237.1 176h51.1C301.1 176 312 186 312 198c0 8-4 14.1-11 18.1L244 251C236 256 232 264 232 272V288c0 13 11 24 24 24S280 301 280 288V286l45.1-28c21-13 34-36 34-60C360 159 329 128 289.1 128z"
+                  /></svg
+                ><svg
+                  v-show="panelStore.inlineHelpVisible"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 512 512"
+                >
+                  <!--! Font Awesome Pro 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2022 Fonticons, Inc. -->
+                  <path
+                    d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM256 400c-18 0-32-14-32-32s13.1-32 32-32c17.1 0 32 14 32 32S273.1 400 256 400zM325.1 258L280 286V288c0 13-11 24-24 24S232 301 232 288V272c0-8 4-16 12-21l57-34C308 213 312 206 312 198C312 186 301.1 176 289.1 176h-51.1C225.1 176 216 186 216 198c0 13-11 24-24 24s-24-11-24-24C168 159 199 128 237.1 128h51.1C329 128 360 159 360 198C360 222 347 245 325.1 258z"
+                  /></svg
+              ></ElIcon>
+            </ElButton>
+          </ElButtonGroup>
           <div class="version">
             <ElLink
               type="info"
@@ -387,6 +445,7 @@ watch(
               class="btn btn100"
               @click="emit('command', 'clear')"
               :disabled="!props.checkCanDoCommand.clear.value"
+              v-help-doc="help('edit-clear-graph')"
             >
               Clear Graph
             </ElButton>
@@ -401,6 +460,7 @@ watch(
               class="btn btn100"
               @click="emit('command', 'b')"
               :disabled="!props.checkCanDoCommand.b.value"
+              v-help-doc="help('edit-new-boundary')"
             >
               New Boundary
             </ElButton>
@@ -1180,6 +1240,26 @@ a.btn {
 </style>
 
 <style>
+.inline-help {
+  font-size: 20px;
+  width: 1em;
+  height: 1em;
+  line-height: 1em;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+.inline-help > div {
+  color: #409eff;
+}
+.inline-help > div:hover,
+.inline-help > div:focus {
+  color: #79bbff;
+}
+.inline-help > div:active {
+  color: #337ecc;
+}
+
 .wide-upload .el-upload,
 .wide-upload .el-upload .el-upload-dragger {
   width: 100%;
