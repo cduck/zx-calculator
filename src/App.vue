@@ -850,7 +850,8 @@ const command = (code) => {
             console.warn(e.message);
           }
         }
-        setSelectionCallback([], mergedEdges);
+        const goodEdges = mergedEdges.filter((e) => gops.edgeExists(e));
+        setSelectionCallback([], goodEdges);
         recordAfterGraphMod("rewrite:delete deg2");
         break;
       }

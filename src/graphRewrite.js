@@ -319,7 +319,10 @@ export class GraphRewrite {
         const regNode = n1 === firstHNode ? n2 : n1;
         [mX, mY] = this.graphOps.locationXY(regNode);
       } else {
-        [mX, mY] = this.graphOps.locationXY(node);
+        const [x1, y1] = this.graphOps.locationXY(n1);
+        const [x2, y2] = this.graphOps.locationXY(n2);
+        mX = (x1 + x2) / 2;
+        mY = (y1 + y2) / 2;
       }
       // Delete nodes and edges
       const finalLocs = {};

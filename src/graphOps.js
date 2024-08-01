@@ -54,6 +54,12 @@ export class GraphOps {
   }
 
   ////////// Graph tests //////////
+  edgeExists(edgeId) {
+    return this.graph.edges[edgeId] !== undefined;
+  }
+  nodeExists(nodeId) {
+    return this.graph.nodes[nodeId] !== undefined;
+  }
   isBoundaryNode(nodeId) {
     return this.graph.nodes[nodeId]?.zxType === "boundary";
   }
