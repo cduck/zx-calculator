@@ -810,21 +810,49 @@ const command = (code) => {
         recordBeforeGraphMod();
         const newEdges = [];
         let newNodes = [];
-        for (const e of selectedEdges.value) {
-          try {
-            if (gops.isHadamardEdge(e)) {
-              newEdges.push(...grewrite.removeHEdgeWithDegree2Nodes(e));
-            } else {
-              newNodes.push(grewrite.mergeNEdge(e));
+        if (selectedEdges.value.length > 0) {
+          for (const e of selectedEdges.value) {
+            try {
+              if (gops.isHadamardEdge(e)) {
+                newEdges.push(...grewrite.removeHEdgeWithDegree2Nodes(e));
+              } else {
+                newNodes.push(grewrite.mergeNEdge(e));
+              }
+            } catch (e) {
+              console.warn(e.message);
             }
-          } catch (e) {
-            console.warn(e.message);
+          }
+        } else {
+          // Auto-select all regular edges between two nodes of the same type
+          console.log("SKJFHSDJKFHSDKJFSF");
+          for (let i = 0; i < 5; i++) {
+            // Limited repetition of 5 won't finish long chains of nodes
+            let edges = Object.keys(graphStore.edges).filter((e) =>
+              gops.isMergableRegularEdge(e)
+            );
+            for (const e of edges) {
+              try {
+                if (gops.isHadamardEdge(e)) {
+                  grewrite.removeHEdgeWithDegree2Nodes(e);
+                } else {
+                  newNodes.push(grewrite.mergeNEdge(e));
+                }
+              } catch (e) {
+                console.warn(e.message);
+              }
+            }
+            if (edges.length <= 0) {
+              break;
+            }
           }
         }
         if (newEdges.length > 0) {
           newNodes = [];
         }
-        setSelectionCallback(newNodes, newEdges);
+        setSelectionCallback(
+          newNodes.filter((n) => gops.nodeExists(n)),
+          newEdges.filter((e) => gops.edgeExists(e))
+        );
         recordAfterGraphMod("rewrite:hadamard cancellation");
         break;
       }
@@ -1090,6 +1118,13 @@ const checkCanDoCommandRewrite = {
     return false;
   }),
   h: computed(() => {
+    if (selectedEdges.value.length <= 0 && selectedNodes.value.length <= 0) {
+      for (const edge of Object.keys(graphStore.edges)) {
+        if (gops.isMergableRegularEdge(edge)) {
+          return true;
+        }
+      }
+    }
     for (const edge of selectedEdges.value) {
       if (gops.isHadamardEdge(edge)) {
         if (grewrite.removeHEdgeWithDegree2NodesIsValid(edge)) return true;

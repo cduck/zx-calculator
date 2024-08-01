@@ -100,6 +100,13 @@ export class GraphOps {
       this.degree(nodeId) == 2
     );
   }
+  isMergableRegularEdge(edgeId) {
+    if (this.isHadamardEdge(edgeId)) {
+      return false;
+    }
+    const [n1, n2] = this.nodesOfEdge(edgeId);
+    return this.isZOrXNode(n1) && this.nodeType(n1) === this.nodeType(n2);
+  }
 
   isEdgesValidPath(edgeIds, ignoreCurrent) {
     const orderedEdges = this._isEdgesValidPathHelper(edgeIds, ignoreCurrent);
