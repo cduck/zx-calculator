@@ -654,14 +654,27 @@ watch(
           <div
             @mouseenter="leftTooltipMouseEnter"
             @mouseleave="leftTooltipMouseLeave"
-            tooltip="Identity Removal:<br />Remove a degree-2 node by merging its two neighbors (if connected by Hadamard edges and colors match) [J]"
+            tooltip="Identity Removal:<br />Remove a degree-2 node and join its two edges (if the node has no phase) [L]"
+          >
+            <ElButton
+              class="btn btn100"
+              @click="emit('command', 'l')"
+              :disabled="!props.checkCanDoCommand.l.value"
+            >
+              Delete Degree-2
+            </ElButton>
+          </div>
+          <div
+            @mouseenter="leftTooltipMouseEnter"
+            @mouseleave="leftTooltipMouseLeave"
+            tooltip="Identity Removal:<br />Remove a degree-2 node by merging its two neighbors (if connected by Hadamard edges, colors match, and the node has no phase) [J]"
           >
             <ElButton
               class="btn btn100"
               @click="emit('command', 'j')"
               :disabled="!props.checkCanDoCommand.j.value"
             >
-              Remove Degree-2
+              Merge Degree-2
             </ElButton>
           </div>
           <div

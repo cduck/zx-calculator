@@ -222,6 +222,115 @@ export class GraphRewrite {
     }
   }
 
+  // Identity removal
+  // The node may be X or Z type, must have degree-2, and must have zero angle
+  // The result is the two neighbor nodes are now connected with a single edge
+  // of type Hadamard if exactly one of the two original edges were Hadamard
+  removeDegree2NodeSimpleIsValid(node) {
+    try {
+      this.removeDegree2NodeSimple(node, true);
+    } catch (e) {
+      if (e instanceof GraphRewriteException) return false;
+      throw e;
+    }
+    return true;
+  }
+  removeDegree2NodeSimple(node, dryRun) {
+    if (!this.graphOps.isDegree2NodeSimple(node)) {
+      throw new GraphRewriteException(
+        "node is not Z- or X-type, does not have degree 2, or has a nonzero " +
+          "angle"
+      );
+    }
+    let firstHNode;
+    const neighbors = new Set();
+    const edges = new Set();
+    let hCount = 0;
+    this.graphOps.forEdgesOfNodes([node], (edge) => {
+      const [maybe1, maybe2] = this.graphOps.nodesOfEdge(edge);
+      const n1 = maybe1 === node ? maybe2 : maybe1;
+      neighbors.add(n1);
+      edges.add(edge);
+      const isHEdge = this.graphOps.isHadamardEdge(edge);
+      hCount += isHEdge;
+      if (isHEdge && firstHNode === undefined) {
+        firstHNode = n1;
+      }
+    });
+    if (neighbors.size !== 2 || edges.size !== 2) {
+      throw new GraphRewriteException("node did not have 2 neighbors");
+    }
+    const [n1, n2] = neighbors;
+    if (!dryRun) {
+      const oldTransfer = [...edges];
+      const newTransfer = [];
+      // Add edges
+      if (hCount === 1) {
+        // Animate the removal so that the node looks like it's merging with the
+        // node connected by a normal edge
+        newTransfer.push(
+          this.graphOps.toggleHadamardEdgeHandleSelfLoop(
+            n1,
+            n2,
+            undefined,
+            true,
+            false,
+            true
+          )
+        );
+      } else {
+        // Animate the removal so the node fades away while the edges (of the
+        // same type) become one
+        newTransfer.push(this.graphOps.addEdge(n1, n2, "normal", true, true));
+      }
+      const [newEdge] = newTransfer;
+      // Adjust paths
+      this.graphOps.forPathsOfEdges(oldTransfer, (pathId) => {
+        const pathEdges = this.graphOps.pathEdges(pathId);
+        const transerIdx = [];
+        for (let i = 0; i < oldTransfer.length; i++) {
+          if (pathEdges.indexOf(oldTransfer[i]) >= 0) {
+            transerIdx.push(i);
+          }
+        }
+        if (transerIdx.length !== 2) {
+          throw new GraphRewriteException(
+            "unexpected matched edges, likely malformed path nearby"
+          );
+        }
+        // Path goes through the removed node and both edges
+        const pedge1 = oldTransfer[transerIdx[0]]; // pedge2 also exists
+        const nedge1 = newTransfer[transerIdx[0]];
+        const selfLoop = !nedge1;
+        let inserted = selfLoop ? [] : [nedge1];
+        const [, n2] = this.graphOps.nodesOfEdge(pedge1);
+        if (n2 === node) {
+          // Forward path
+          this.graphOps.substitutePathEdge(pedge1, inserted, 0, 1);
+        } else {
+          // Reverse path
+          this.graphOps.substitutePathEdge(pedge1, inserted, 1, 0);
+        }
+      });
+      // Move node towards neighbor along normal edge (if other edge is
+      // Hadamard)
+      let mX, mY;
+      if (hCount == 1) {
+        const regNode = n1 === firstHNode ? n2 : n1;
+        [mX, mY] = this.graphOps.locationXY(regNode);
+      } else {
+        [mX, mY] = this.graphOps.locationXY(node);
+      }
+      // Delete nodes and edges
+      const finalLocs = {};
+      finalLocs[node] = { x: mX, y: mY };
+      this.graphOps.deleteEdges(oldTransfer, undefined, false);
+      this.graphOps.deleteNodes([node], finalLocs, false, false);
+      // Return a useful output
+      return newEdge;
+    }
+  }
+
   // Hadamard cancellation
   // The node must have degree-2 with both edges the same type and have zero
   // angle

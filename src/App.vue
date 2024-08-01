@@ -834,6 +834,26 @@ const command = (code) => {
       case "G": // Reverse Hadamard cancellation (Using X node)
         reverseHadamardCancellation(true);
         break;
+      case "l": {
+        recordAfterGraphMod();
+        const mergedEdges = [];
+        let nodes = [...selectedNodes.value];
+        if (nodes.length <= 0) {
+          nodes = Object.keys(graphStore.nodes).filter((n) =>
+            gops.isDegree2NodeSimple(n)
+          );
+        }
+        for (const n of nodes) {
+          try {
+            mergedEdges.push(grewrite.removeDegree2NodeSimple(n));
+          } catch (e) {
+            console.warn(e.message);
+          }
+        }
+        setSelectionCallback([], mergedEdges);
+        recordAfterGraphMod("rewrite:delete deg2");
+        break;
+      }
       case "k":
       case "j": {
         // Hadamard cancellation / merge node
@@ -1085,6 +1105,18 @@ const checkCanDoCommandRewrite = {
     return false;
   }),
   G: computed(() => checkCanDoCommand.H),
+  l: computed(() => {
+    if (selectedEdges.value.length <= 0 && selectedNodes.value.length <= 0) {
+      for (const n of Object.keys(graphStore.nodes)) {
+        if (gops.isDegree2NodeSimple(n)) return true;
+      }
+      return false;
+    }
+    for (const node of selectedNodes.value) {
+      if (grewrite.removeDegree2NodeSimpleIsValid(node)) return true;
+    }
+    return false;
+  }),
   j: computed(() => {
     for (const node of selectedNodes.value) {
       if (grewrite.removeDegree2NodeWithHEdgesIsValid(node)) return true;

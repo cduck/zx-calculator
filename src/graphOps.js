@@ -87,6 +87,14 @@ export class GraphOps {
     this.animSpec.setEdgeType(edgeId, zxType);
   }
 
+  isDegree2NodeSimple(nodeId) {
+    return (
+      this.isZOrXNode(nodeId) &&
+      this.hasAngleZero(nodeId) &&
+      this.degree(nodeId) == 2
+    );
+  }
+
   isEdgesValidPath(edgeIds, ignoreCurrent) {
     const orderedEdges = this._isEdgesValidPathHelper(edgeIds, ignoreCurrent);
     return typeof orderedEdges !== "string";
